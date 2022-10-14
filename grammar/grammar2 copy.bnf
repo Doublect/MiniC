@@ -1,0 +1,26 @@
+program -> externlist decllist | decllist
+externlist -> externlist extern | extern
+extern -> extern typespec IDENT ( params ) ;
+decllist -> decllist decl | decl
+decl -> vardecl | fundecl
+vardecl -> vartype IDENT ;
+typespec -> void | vartype
+vartype -> int | float | bool
+fundecl -> typespec IDENT ( params ) block
+params -> paramlist | void | epsilon
+paramlist -> paramlist , param | param
+param -> vartype IDENT
+block -> { localdecls stmtlist }
+localdecls -> localdecls localdecl | epsilon
+localdecl -> vartype IDENT ;
+stmtlist -> stmtlist stmt | epsilon
+stmt -> exprstmt | block | ifstmt | whilestmt | returnstmt
+exprstmt -> expr ; | ;
+whilestmt -> while ( expr ) stmt
+ifstmt -> if ( expr ) block elsestmt
+elsestmt -> else block | epsilon
+returnstmt -> return ; | return expr ;
+expr -> IDENT = expr | rval
+rval -> rval || rval | rval && rval | rval == rval | rval != rval | rval <= rval | rval < rval | rval >= rval | rval > rval | rval + rval | rval - rval | rval * rval | rval / rval | rval % rval | - rval | ! rval | ( expr ) | IDENT | IDENT ( args ) | INTLIT | FLOATLIT | BOOLLIT
+args -> arglist | epsilon
+arglist -> arglist , expr | expr 

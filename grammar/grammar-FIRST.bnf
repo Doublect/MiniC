@@ -1,0 +1,108 @@
+program ::= @"extern" 
+        | "void" | "int" |  "float" |  "bool"
+
+extern_list ::= @"extern"
+extern_list_prime ::= @"extern" | epsilon
+
+extern ::= @"extern"
+extern_params ::= @"int" |  "float" |  "bool"  |  "void" | ")"
+
+decl_list ::= @"void" | "int" |  "float" |  "bool"
+decl_list_prime ::= @"void" | "int" |  "float" |  "bool" | epsilon
+
+decl ::= @"void" | "int" |  "float" |  "bool"
+decl_end ::= @"(" |  ";"
+
+fun_decl_end ::= @"int" |  "float" |  "bool"  |  "void" | ")" | epsilon
+
+type_spec ::= @"void" | "int" |  "float" |  "bool"
+var_type  ::= @"int" |  "float" |  "bool"
+
+
+params ::= @"int" |  "float" |  "bool"  |  "void"
+
+param_list ::= @"int" |  "float" |  "bool"
+param_list_prime ::= @"," | epsilon
+
+param ::= @"int" |  "float" |  "bool"
+
+block ::= @"{"
+block_end ::= @"int" |  "float" |  "bool"
+            | "(" | "-" | "!" | ";" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT 
+
+local_decls ::= @"int" |  "float" |  "bool"
+local_decls_prime ::= @"int" |  "float" |  "bool" | epsilon
+
+local_decl ::= @"int" |  "float" |  "bool"
+
+stmt_list ::= @"(" | "-" | "!" | ";" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT 
+            |  "{" 
+            |  "if" 
+            |  "while"
+            |  "return"
+stmt_list_prime ::= @"(" | "-" | "!" | ";" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT 
+                |  "{" 
+                |  "if" 
+                |  "while"
+                |  "return"
+                | epsilon
+
+stmt ::= @"(" | "-" | "!" | ";" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT 
+    |  "{" 
+    |  "if" 
+    |  "while"
+    |  "return"
+expr_stmt ::= @"(" | "-" | "!" | ";" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT
+
+while_stmt ::= @"while"
+
+if_stmt ::= @"if"
+if_stmt_end ::=  @"else" | epsilon
+
+else_stmt  ::= @"else"
+
+return_stmt ::= @"return"               
+return_end ::= @"(" | "-" | "!" | ";" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT
+
+# !NOT DISJOINT FIRST (expr, or_expr)   
+expr ::= @"(" | "-" | "!" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT
+
+
+# OOP
+# 1. Literals
+literals ::=  @INT_LIT | FLOAT_LIT | BOOL_LIT
+identifiers ::= @IDENT
+# identifier_end ::= "(" ident_end_end | "(" ident_end_end | epsilon
+# ident_end_end ::= args ")" | ")"
+
+primary_expr ::= @INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT
+
+parantheses_expr ::= @"(" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT
+unary_expr ::= @"(" | "-" | "!" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT
+
+mult_expr ::= @"(" | "-" | "!" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT
+mult_expr_prime ::= @"*" | "/" | "%" | epsilon
+
+add_expr ::= @"(" | "-" | "!" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT
+add_expr_prime ::= @"+" | "-" | epsilon
+
+rel_expr ::= @"(" | "-" | "!" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT
+rel_expr_prime ::= @"<" | "<=" | ">" | ">=" | epsilon
+
+eq_expr ::= @"(" | "-" | "!" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT
+eq_expr_prime ::= @"==" | "!=" | epsilon
+
+and_expr ::= @"(" | "-" | "!" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT
+and_expr_prime ::= @"&&" | epsilon
+
+or_expr ::= @"(" | "-" | "!" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT
+or_expr_prime ::= @"||" | epsilon
+
+# !NOT DISJOINT FIRST (args, arg_list)   
+args ::= @"(" | "-" | "!" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT
+
+args ::= arg_list 
+
+# !NOT DISJOINT FIRST (expr)   
+arg_list ::= @"(" | "-" | "!" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT
+arg_list_prime ::= @"," | epsilon

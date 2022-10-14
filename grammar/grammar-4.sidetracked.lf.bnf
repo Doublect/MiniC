@@ -1,0 +1,111 @@
+program ::= extern_list decl_list 
+        | decl_list
+
+extern_list ::= extern extern_list_prime
+extern_list_prime ::= extern extern_list_prime
+                    | epsilon
+
+extern ::= "extern" type_spec IDENT "(" extern_params
+
+extern_params ::= params ")" ";"
+                | ")" ";"
+
+decl_list ::= decl decl_list_prime
+decl_list_prime ::= decl decl_list_prime
+                  | epsilon
+
+fun_decl_end ::= params ")" block
+               | ")" block
+
+decl ::= var_type IDENT decl_end
+    | "void" IDENT "(" fun_decl_end
+decl_end ::= ";" | "(" fun_decl_end
+
+type_spec ::= "void"
+            |  var_type           
+var_type  ::= "int" |  "float" |  "bool"
+
+
+params ::= param_list  |  "void"
+
+param_list ::= param param_list_prime
+param_list_prime ::= "," param param_list_prime
+                  | epsilon
+
+param ::= var_type IDENT
+
+block ::= "{" block_end
+block_end ::= local_decls stmt_list "}"
+            | stmt_list "}"
+            | local_decls "}"
+            | "}"
+
+local_decls ::= local_decl local_decls_prime
+local_decls_prime ::= local_decl local_decls_prime
+                    | epsilon
+
+local_decl ::= var_type IDENT ";"
+
+stmt_list ::= stmt stmt_list_prime 
+stmt_list_prime ::= stmt stmt_list_prime
+                  | epsilon
+
+stmt ::= expr_stmt 
+    |  block 
+    |  if_stmt 
+    |  while_stmt 
+    |  return_stmt
+expr_stmt ::= expr ";" 
+            |  ";"
+while_stmt ::= "while" "(" expr ")" stmt 
+
+if_stmt ::= "if" "(" expr ")" block if_stmt_end
+if_stmt_end ::=  else_stmt
+            | epsilon
+
+else_stmt  ::= "else" block
+
+return_stmt ::= "return" return_end               
+return_end ::= ";" | expr ";"
+
+# operators in order of increasing precedence      
+expr ::= IDENT "=" expr
+    | or_expr
+
+# OOP
+# 1. Literals
+literals ::=  INT_LIT | FLOAT_LIT | BOOL_LIT
+identifiers ::= IDENT | IDENT "(" args ")" | IDENT "(" ")"
+# identifier_end ::= "(" ident_end_end | "(" ident_end_end | epsilon
+# ident_end_end ::= args ")" | ")"
+
+primary_expr ::= literals | identifiers
+
+parantheses_expr ::= "(" expr ")" | primary_expr
+unary_expr ::= "-" unary_expr | "!" unary_expr | parantheses_expr
+
+mult_expr ::= unary_expr mult_expr_prime
+mult_expr_prime ::= "*" unary_expr mult_expr_prime | "/" unary_expr mult_expr_prime | "%" unary_expr mult_expr_prime | epsilon
+
+add_expr ::= mult_expr add_expr_prime
+add_expr_prime ::= "+" mult_expr add_expr_prime | "-" mult_expr add_expr_prime | epsilon
+
+rel_expr ::= add_expr rel_expr_prime
+rel_expr_prime ::= "<" add_expr rel_expr_prime | "<=" add_expr rel_expr_prime | ">" add_expr rel_expr_prime | ">=" add_expr rel_expr_prime| epsilon
+
+eq_expr ::= rel_expr eq_expr_prime
+eq_expr_prime ::= "==" rel_expr eq_expr_prime | "!=" rel_expr eq_expr_prime | epsilon
+
+and_expr ::= eq_expr and_expr_prime
+and_expr_prime ::= "&&" eq_expr and_expr_prime | epsilon
+
+or_expr ::= and_expr or_expr_prime
+or_expr_prime ::= "||" and_expr or_expr_prime | epsilon
+
+assign_expr 
+
+args ::= arg_list 
+
+arg_list ::= expr arg_list_prime
+arg_list_prime ::= "," expr arg_list_prime
+                | epsilon

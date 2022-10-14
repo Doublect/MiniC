@@ -1,0 +1,55 @@
+PROGRAM -> EXTERN_LIST DECL_LIST 
+        | DECL_LIST
+EXTERN_LIST -> EXTERN_LIST extern
+            |  EXTERN
+EXTERN -> "extern" TYPE_SPEC IDENT "(" PARAMS ")" ";"
+DECL_LIST -> DECL_LIST DECL
+            |  DECL
+DECL -> VAR_DECL 
+    |  fun_DECL
+VAR_DECL -> VAR_TYPE IDENT ";" 
+TYPE_SPEC -> "void"
+            |  VAR_TYPE           
+VAR_TYPE  -> "int" |  "float" |  "bool"
+fun_DECL -> TYPE_SPEC IDENT "(" PARAMS ")" BLOCK
+PARAMS -> PARAM_LIST  
+        |  "void" | epsilon
+PARAM_LIST -> PARAM_LIST "," PARAM 
+            |  PARAM
+PARAM -> VAR_TYPE IDENT
+BLOCK -> "{" LOCAL_DECLS STMT_LIST "}"
+LOCAL_DECLS -> LOCAL_DECLS LOCAL_DECL
+            |  epsilon
+LOCAL_DECL -> VAR_TYPE IDENT ";"
+STMT_LIST -> STMT_LIST stmt 
+            |  epsilon
+STMT -> EXPR_STMT 
+    |  BLOCK 
+    |  IF_STMT 
+    |  WHILE_STMT 
+    |  RETURN_STMT
+EXPR_STMT -> EXPR ";" 
+            |  ";"
+WHILE_STMT -> "while" "(" EXPR ")" stmt 
+IF_STMT -> "if" "(" EXPR ")" BLOCK ELSE_STMT
+ELSE_STMT  -> "else" BLOCK
+            |  epsilon
+RETURN_STMT -> "return" ";" 
+            |  "return" EXPR ";"               
+# operators in order of increasing precedence      
+EXPR -> IDENT "=" EXPR
+    | RVAL
+RVAL -> RVAL "||" RVAL                                              
+    | RVAL "&&" RVAL                                             
+    | RVAL "==" RVAL | RVAL "!=" RVAL                            
+    | RVAL "<=" RVAL | RVAL "<" RVAL | RVAL ">=" RVAL | RVAL ">" RVAL
+    | RVAL "+" RVAL  | RVAL "-" RVAL
+    | RVAL "*" RVAL  | RVAL "/" RVAL  | RVAL "%" RVAL
+    | "-" RVAL | "!" RVAL
+    | "(" EXPR ")"
+    | IDENT | IDENT "(" ARGS ")" 
+    | INT_LIT | FLOAT_LIT | BOOL_LIT        
+ARGS -> ARG_LIST 
+    |  epsilon
+ARG_LIST -> ARG_LIST "," EXPR
+        |  EXPR          

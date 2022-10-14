@@ -1,0 +1,160 @@
+program ::= &EOF
+
+extern_list ::= &"void" | "int" |  "float" |  "bool"
+extern_list_prime ::= &"void" | "int" |  "float" |  "bool"
+
+extern ::= &"extern" | "void" | "int" |  "float" |  "bool"
+
+extern_params ::= &"extern" | "void" | "int" |  "float" |  "bool"
+
+decl_list ::= &EOF
+decl_list_prime ::= &EOF
+
+decl ::= &EOF | "void" | "int" |  "float" |  "bool"
+decl_end ::= &EOF | "void" | "int" |  "float" |  "bool"
+
+fun_decl_end ::= &EOF | "void" | "int" |  "float" |  "bool"
+type_spec ::= &IDENT          
+var_type  ::= &IDENT
+
+
+params ::= &")"
+
+param_list ::= &")"
+param_list_prime ::= &")"
+
+param :: &"," | ")"
+
+block ::= &EOF | "void" | "int" |  "float" |  "bool" | 
+    | "(" | "-" | "!" | ";" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT 
+    |  "if" 
+    |  "while"
+    |  "return"
+    |  "{"
+    |  "}"
+
+block_end ::= &EOF | "void" | "int" |  "float" |  "bool" | 
+    | "(" | "-" | "!" | ";" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT 
+    |  "if" 
+    |  "while"
+    |  "return"
+    |  "{"
+    |  "}"
+
+local_decls ::= &"}"
+            |  "(" | "-" | "!" | ";" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT 
+            |  "{" 
+            |  "if" 
+            |  "while"
+            |  "return"
+local_decls_prime ::= &"}"
+            |  "(" | "-" | "!" | ";" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT 
+            |  "{" 
+            |  "if" 
+            |  "while"
+            |  "return"
+
+local_decl ::= &"int" |  "float" |  "bool"
+            |  "}"
+            |  "(" | "-" | "!" | ";" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT 
+            |  "{" 
+            |  "if" 
+            |  "while"
+            |  "return"
+
+stmt_list ::= &"}"
+stmt_list_prime ::= &"}"
+
+stmt ::= &"(" | "-" | "!" | ";" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT 
+    |  "{" 
+    |  "if" 
+    |  "while"
+    |  "return"
+    |  "}"
+
+expr_stmt ::= &"(" | "-" | "!" | ";" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT 
+    |  "{" 
+    |  "if" 
+    |  "while"
+    |  "return"
+    |  "}"
+while_stmt ::= &"(" | "-" | "!" | ";" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT 
+    |  "{" 
+    |  "if" 
+    |  "while"
+    |  "return"
+    |  "}"
+
+if_stmt ::= &"(" | "-" | "!" | ";" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT 
+    |  "{" 
+    |  "if" 
+    |  "while"
+    |  "return"
+    |  "}"
+
+if_stmt_end ::= &"(" | "-" | "!" | ";" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT 
+    |  "{" 
+    |  "if" 
+    |  "while"
+    |  "return"
+    |  "}"
+
+else_stmt  ::= &"(" | "-" | "!" | ";" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT 
+    |  "{" 
+    |  "if" 
+    |  "while"
+    |  "return"
+    |  "}"
+
+return_stmt ::= &"(" | "-" | "!" | ";" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT 
+    |  "{" 
+    |  "if" 
+    |  "while"
+    |  "return"
+    |  "}"
+
+return_end ::= &"(" | "-" | "!" | ";" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT 
+    |  "{" 
+    |  "if" 
+    |  "while"
+    |  "return"
+    |  "}"
+
+# operators in order of increasing precedence      
+expr ::= &"," | ";" | ")"
+
+# OOP
+# 1. Literals
+literals ::=  &"*" | "/" | "%" | "+" | "-" | ">" | ">=" | "<" | "<=" | "==" | "!=" |"&&" | "||" | "," | ";" | ")"
+identifiers ::= &"*" | "/" | "%" | "+" | "-" | ">" | ">=" | "<" | "<=" | "==" | "!=" |"&&" | "||" | "," | ";" | ")"
+# identifier_end ::= "(" ident_end_end | "(" ident_end_end | epsilon
+# ident_end_end ::= args ")" | ")"
+
+primary_expr ::= &"*" | "/" | "%" | "+" | "-" | ">" | ">=" | "<" | "<=" | "==" | "!=" |"&&" | "||" | "," | ";" | ")"
+
+parantheses_expr ::= &"*" | "/" | "%" | "+" | "-" | ">" | ">=" | "<" | "<=" | "==" | "!=" |"&&" | "||" | "," | ";" | ")"
+
+unary_expr ::= &"*" | "/" | "%" | "+" | "-" | ">" | ">=" | "<" | "<=" | "==" | "!=" |"&&" | "||" | "," | ";" | ")"
+
+mult_expr ::= &"+" | "-" | ">" | ">=" | "<" | "<=" | "==" | "!=" |"&&" | "||" | "," | ";" | ")"
+mult_expr_prime ::= &"+" | "-" | "%" | ">" | ">=" | "<" | "<=" | "==" | "!=" |"&&" | "||" | "," | ";" | ")"
+
+add_expr ::= &">" | ">=" | "<" | "<=" | "==" | "!=" |"&&" | "||" | "," | ";" | ")"
+add_expr_prime ::= &">" | ">=" | "<" | "<=" | "==" | "!=" |"&&" | "||" | "," | ";" | ")"
+
+rel_expr ::= &"==" | "!=" |"&&" | "||" | "," | ";" | ")"
+rel_expr_prime ::= &"==" | "!=" |"&&" | "||" | "," | ";" | ")"
+
+eq_expr ::= &"&&" | "||" | "," | ";" | ")"
+eq_expr_prime ::= &"&&" | "||" | "," | ";" | ")"
+
+and_expr ::= &"||" | "," | ";" | ")"
+and_expr_prime ::= &"||"| "," | ";" | ")"
+
+or_expr ::= &"," | ";" | ")"
+or_expr_prime ::= &"," | ";" | ")"
+
+args ::= &")" 
+
+arg_list ::= &")" 
+arg_list_prime ::= &")" 
