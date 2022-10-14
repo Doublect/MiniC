@@ -1,24 +1,25 @@
-#include "llvm/ADT/APFloat.h"
-#include "llvm/ADT/Optional.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/LegacyPassManager.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/Type.h"
-#include "llvm/IR/Verifier.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/Host.h"
-//#include "llvm/Support/TargetRegistry.h"
-#include "llvm/Support/TargetSelect.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Target/TargetMachine.h"
-#include "llvm/Target/TargetOptions.h"
+// #include "llvm/ADT/APFloat.h"
+// #include "llvm/ADT/Optional.h"
+// #include "llvm/ADT/STLExtras.h"
+// #include "llvm/IR/BasicBlock.h"
+// #include "llvm/IR/Constants.h"
+// #include "llvm/IR/DerivedTypes.h"
+// #include "llvm/IR/Function.h"
+// #include "llvm/IR/IRBuilder.h"
+// #include "llvm/IR/Instructions.h"
+// #include "llvm/IR/LLVMContext.h"
+// #include "llvm/IR/LegacyPassManager.h"
+// #include "llvm/IR/Module.h"
+// #include "llvm/IR/Type.h"
+// #include "llvm/IR/Verifier.h"
+#include "llvm/IR/Value.h"
+// #include "llvm/Support/FileSystem.h"
+// #include "llvm/Support/Host.h"
+// //#include "llvm/Support/TargetRegistry.h"
+// #include "llvm/Support/TargetSelect.h"
+// #include "llvm/Support/raw_ostream.h"
+// #include "llvm/Target/TargetMachine.h"
+// #include "llvm/Target/TargetOptions.h"
 #include <algorithm>
 #include <cassert>
 #include <cctype>
@@ -34,11 +35,10 @@
 #include <utility>
 #include <vector>
 
-#include "lexer.hpp"
-#include "mccomp.hpp"
+#include "lexer.cpp"
 
 using namespace llvm;
-using namespace llvm::sys;
+//using namespace llvm::sys;
 
 static FILE *pFile;
 
@@ -69,9 +69,7 @@ using namespace tst;
 static TOKEN CurTok;
 static std::deque<TOKEN> tok_buffer;
 
-const inline static ParserFunction<ExprASTNode> or_expr;
-
-static TOKEN getNextToken() {
+static inline TOKEN getNextToken() {
 
   if (tok_buffer.size() == 0)
     tok_buffer.push_back(gettok(pFile));
@@ -93,12 +91,13 @@ class ASTNode {
 public:
   virtual ~ASTNode() {}
   virtual Value *codegen() = 0;
-  virtual std::string to_string() const {};
+  virtual std::string to_string() const { return "ASTNode"; };
 };
 
 class ExprASTNode : public ASTNode {
 public:
-  virtual Value *codegen() override;
+  ExprASTNode() {}
+  virtual Value *codegen() {return nullptr;};
 };
 
 /// AST representation of an integer number
@@ -109,7 +108,7 @@ class IntASTNode : public ExprASTNode {
 
 public:
   IntASTNode(TOKEN tok, int val) : Val(val), Tok(tok) {}
-  virtual Value *codegen() override;
+    virtual Value *codegen() {return nullptr;};
   // virtual std::string to_string() const override {
   // return a sting representation of this AST node
   //};
@@ -123,7 +122,8 @@ class BoolASTNode : public ExprASTNode {
 
 public:
   BoolASTNode(TOKEN tok, bool val) : Val(val), Tok(tok) {}
-  virtual Value *codegen() override;
+    virtual Value *codegen() {return nullptr;};
+
 };  
 
 /// AST representation of a float literal
@@ -134,7 +134,7 @@ class FloatASTNode : public ExprASTNode {
 
 public:
   FloatASTNode(TOKEN tok, float val) : Val(val), Tok(tok) {}
-  virtual Value *codegen() override;
+  virtual Value *codegen() {return nullptr;};
 };
 
 ///----------------------------------------------------------------------------
@@ -150,7 +150,7 @@ class UnaryASTNode : public ExprASTNode {
 public:
   UnaryASTNode(TOKEN tok, TOKEN_TYPE op, std::unique_ptr<ASTNode> operand)
       : Op(op), Operand(std::move(operand)), Tok(tok) {}
-  virtual Value *codegen() override;
+  virtual Value *codegen() {return nullptr;};
 };
 
 /// AST representation of a binary expression
@@ -165,9 +165,7 @@ public:
   BinaryASTNode(TOKEN tok, TOKEN_TYPE op, std::unique_ptr<ASTNode> LHS,
                 std::unique_ptr<ASTNode> RHS)
       : Op(op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
-  virtual Value *codegen() override;
-
-  
+  virtual Value *codegen() {return nullptr;};
 };
 
 /// AST representation of a variable reference
@@ -177,7 +175,7 @@ class VariableRefASTNode : public ExprASTNode {
 
 public: 
   VariableRefASTNode(TOKEN tok, const std::string &Name) : Name(Name) {}
-  virtual Value *codegen() override;
+  virtual Value *codegen() {return nullptr;};
 };
 
 // AST representation of a function call
@@ -191,6 +189,7 @@ public:
   CallExprAST(TOKEN tok, const std::string &funcName,
               std::vector<std::unique_ptr<ExprASTNode>> Args)
     : tok(tok), FunctionName(funcName), Args(std::move(Args)) {}
+  virtual Value *codegen() {return nullptr;};
 };
 
 class AssignmentASTNode : public ExprASTNode {
@@ -202,7 +201,7 @@ public:
   AssignmentASTNode(TOKEN tok, const std::string& Name,
                     std::unique_ptr<ASTNode> RHS)
       : Name(Name), RHS(std::move(RHS)) {}
-  virtual Value *codegen() override;
+  virtual Value *codegen() {return nullptr;};
 };
 
 ///----------------------------------------------------------------------------
@@ -212,7 +211,7 @@ public:
 class StatementASTNode : public ASTNode {
 public:
   StatementASTNode() {}
-  virtual Value *codegen() override;
+  virtual Value *codegen() {return nullptr;};
 };
 
 class ExprStatementASTNode: public StatementASTNode {
@@ -220,7 +219,7 @@ class ExprStatementASTNode: public StatementASTNode {
 
 public:
   ExprStatementASTNode(std::unique_ptr<ExprASTNode> expr) : Expr(std::move(expr)) {}
-  virtual Value *codegen() override;
+  virtual Value *codegen() {return nullptr;};
 };
 
 class VariableDeclASTNode;
@@ -230,7 +229,7 @@ class BlockAstNode: public StatementASTNode {
   std::vector<std::unique_ptr<StatementASTNode>> Statements;
 public:
   BlockAstNode(std::vector<std::unique_ptr<StatementASTNode>> statements) : Statements(std::move(statements)) {}
-  virtual Value *codegen() override;
+  virtual Value *codegen() {return nullptr;};
 };
 
 class IfElseASTNode : public StatementASTNode {
@@ -242,7 +241,7 @@ public:
   IfElseASTNode(std::unique_ptr<ExprASTNode> Cond, std::unique_ptr<BlockAstNode> Then,
                 std::unique_ptr<BlockAstNode> Else)
       : Cond(std::move(Cond)), Then(std::move(Then)), Else(std::move(Else)) {}
-  virtual Value *codegen() override;
+  virtual Value *codegen() {return nullptr;};
 };
 
 class WhileASTNode: public StatementASTNode {
@@ -252,7 +251,7 @@ class WhileASTNode: public StatementASTNode {
 public:
   WhileASTNode(std::unique_ptr<ExprASTNode> Cond, std::unique_ptr<BlockAstNode> Body)
       : Cond(std::move(Cond)), Body(std::move(Body)) {}
-  virtual Value *codegen() override;
+  virtual Value *codegen() {return nullptr;};
 };
 
 class ReturnStmtASTNode: public StatementASTNode {
@@ -260,7 +259,7 @@ class ReturnStmtASTNode: public StatementASTNode {
 
 public:
   ReturnStmtASTNode(std::unique_ptr<ExprASTNode> expr) : Expr(std::move(expr)) {}
-  virtual Value *codegen() override;
+  virtual Value *codegen() {return nullptr;};
 };
 
 class AssignmentStmtASTNode : public StatementASTNode {
@@ -272,13 +271,13 @@ public:
   AssignmentStmtASTNode(TOKEN tok, const std::string& Name,
                     std::unique_ptr<ASTNode> RHS)
       : Name(Name), RHS(std::move(RHS)) {}
-  virtual Value *codegen() override;
+  virtual Value *codegen() {return nullptr;};
 };
 class EmptyStatementASTNode: public StatementASTNode {
 
   public:
     EmptyStatementASTNode() {}
-    virtual Value *codegen() override;
+    virtual Value *codegen() {return nullptr;};
 };
 #pragma endregion
 ///----------------------------------------------------------------------------
@@ -289,7 +288,7 @@ class DeclASTNode : public ASTNode {
 
 public:
   DeclASTNode() {}
-  virtual Value *codegen() override;
+  virtual Value *codegen() {return nullptr;};
 };
 
 class VariableDeclASTNode : public DeclASTNode {
@@ -299,12 +298,15 @@ class VariableDeclASTNode : public DeclASTNode {
 
 public:
   VariableDeclASTNode(TOKEN tok, const std::string &Name, VariableType type) : Name(std::move(Name)), Type(type) {}
-  virtual Value *codegen() override;
+  virtual Value *codegen() {return nullptr;};
 };
 
 class FunctionParameterASTNode : public VariableDeclASTNode {
   // Inherit constructor
   using VariableDeclASTNode::VariableDeclASTNode;
+
+public:
+  virtual Value *codegen() {return nullptr;};
 };
 
 class FunctionDeclASTNode : public DeclASTNode {
@@ -318,7 +320,7 @@ public:
                       std::vector<std::unique_ptr<FunctionParameterASTNode>> Args,
                       std::unique_ptr<BlockAstNode> Body, TypeSpecType returnType)
       : Name(Name), Args(std::move(Args)), Body(std::move(Body)), ReturnType(returnType) {}
-  virtual Value *codegen() override;
+  virtual Value *codegen() {return nullptr;};
 };
 
 class ExternFunctionDeclASTNode : public ASTNode {
@@ -331,7 +333,7 @@ public:
                             std::vector<std::unique_ptr<FunctionParameterASTNode>> Args,
                             TypeSpecType returnType)
       : Name(Name), Args(std::move(Args)), ReturnType(returnType) {}
-  virtual Value *codegen() override;
+  virtual Value *codegen() {return nullptr;};
 };
 #pragma endregion
 #pragma endregion
@@ -375,11 +377,15 @@ static bool isIdent() {
   return CurTok.type == TOKEN_TYPE::IDENT;
 }
 
+template<typename T> using ParserFunction = std::function<T()>;
+
+inline static ExprASTNode or_expr();
+
 ///----------------------------------------------------------------------------
 /// Parser Errors
 ///----------------------------------------------------------------------------
 /// LogError* - These are little helper functions for error handling.
-std::unique_ptr<ASTNode> LogError(const char *Str) {
+static std::unique_ptr<ASTNode> LogError(const char *Str) {
   fprintf(stderr, "LogError: %s\n", Str);
   return nullptr;
 }
@@ -411,6 +417,9 @@ static ParserFunction<std::string> ident =
     if(CurTok.type == TOKEN_TYPE::IDENT) {
       return CurTok.lexeme;
     }
+
+    //TODO: Error
+    return CurTok.lexeme;
   };
 
 static void expect(TOKEN_TYPE type) {
@@ -429,6 +438,8 @@ static std::vector<TOKEN> matchPattern(std::vector<TOKEN_TYPE> &pattern) {
     tokens.push_back(CurTok);
     getNextToken();
   }
+
+  return tokens;
 }
 
 static VariableType coerceVarType(TOKEN_TYPE type) {
@@ -466,26 +477,21 @@ static void coerceIdent() {
 static ParserFunction<ExprASTNode> literals =
   [](){
     if(CurTok.type == TOKEN_TYPE::INT_LIT) {
-      int value = std::stoi(CurTok.lexeme);
+      int value = IntVal;
       getNextToken();
 
-      return (ExprASTNode) IntASTNode(CurTok, value);
+      return static_cast<ExprASTNode>(IntASTNode(CurTok, value));
     } else if(CurTok.type == TOKEN_TYPE::FLOAT_LIT) {
-      float value = std::stof(CurTok.lexeme);
+      float value = FloatVal;
       getNextToken();
 
-      return (ExprASTNode) FloatASTNode(CurTok, value);
-    } 
-    
-    //else if(CurTok.type == TOKEN_TYPE::BOOL_LIT) {
-      if(CurTok.lexeme != "true" && CurTok.lexeme != "false") {
-        LogError("Invalid boolean literal");
-      }
-      bool value = CurTok.lexeme == "true";
+      return static_cast<ExprASTNode>(FloatASTNode(CurTok, value));
+    } else { //if(CurTok.type == TOKEN_TYPE::BOOL_LIT)
+      bool value = BoolVal;
       getNextToken();
 
-      return (ExprASTNode) BoolASTNode(CurTok, value);
-    //}
+      return static_cast<ExprASTNode>(BoolASTNode(CurTok, value));
+    }
 
     //TODO: ERROR
   };
@@ -496,10 +502,10 @@ static ParserFunction<ExprASTNode> expr =
       std::string varName = ident();
       getNextToken();
       expect(TOKEN_TYPE::EQ);
-      return (ExprASTNode) AssignmentASTNode(CurTok, std::move(varName), std::move(std::make_unique<ExprASTNode>(expr())));
+      return static_cast<ExprASTNode>(AssignmentASTNode(CurTok, std::move(varName), std::move(std::make_unique<ExprASTNode>(expr()))));
     } 
 
-    return (ExprASTNode) or_expr();
+    return static_cast<ExprASTNode>(or_expr());
   };
 
 static ParserFunction<std::vector<std::unique_ptr<ExprASTNode>>> args = 
@@ -528,15 +534,15 @@ static ParserFunction<ExprASTNode> primary_expr =
       getNextToken();
 
       if(CurTok.type == TOKEN_TYPE::LPAR) {
-        return (ExprASTNode) CallExprAST(CurTok, std::move(varName), args());
+        return static_cast<ExprASTNode>(CallExprAST(CurTok, std::move(varName), args()));
       }
 
       if(CurTok.type == TOKEN_TYPE::ASSIGN) {
         getNextToken();
-        return (ExprASTNode) AssignmentASTNode(CurTok, std::move(varName), std::make_unique<ExprASTNode>(expr()));
+        return static_cast<ExprASTNode>(AssignmentASTNode(CurTok, std::move(varName), std::make_unique<ExprASTNode>(expr())));
       }
 
-      return (ExprASTNode) VariableRefASTNode(CurTok, std::move(varName));
+      return static_cast<ExprASTNode>(VariableRefASTNode(CurTok, std::move(varName)));
     } else {
       return literals();
     }
@@ -557,7 +563,7 @@ static ParserFunction<ExprASTNode> unary_expr =
     if(CurTok.type == TOKEN_TYPE::MINUS || CurTok.type == TOKEN_TYPE::NOT) {
       TOKEN_TYPE op = (TOKEN_TYPE) CurTok.type;
       getNextToken();
-      return (ExprASTNode) UnaryASTNode(CurTok, op, std::make_unique<ExprASTNode>(unary_expr()));
+      return static_cast<ExprASTNode>(UnaryASTNode(CurTok, op, std::make_unique<ExprASTNode>(unary_expr())));
     }
 
     return parentheses_expr();
@@ -572,7 +578,7 @@ static ParserFunction<ExprASTNode> mul_expr =
       getNextToken();
       auto rhs = mul_expr();
 
-      return (ExprASTNode) BinaryASTNode(CurTok, op, std::make_unique<ExprASTNode>(lhs), std::make_unique<ExprASTNode>(rhs));
+      return static_cast<ExprASTNode>(BinaryASTNode(CurTok, op, std::make_unique<ExprASTNode>(lhs), std::make_unique<ExprASTNode>(rhs)));
     }
 
     return lhs;
@@ -587,7 +593,7 @@ static ParserFunction<ExprASTNode> add_expr =
       getNextToken();
       auto rhs = add_expr();
 
-      return (ExprASTNode) BinaryASTNode(CurTok, op, std::make_unique<ExprASTNode>(lhs), std::make_unique<ExprASTNode>(rhs));
+      return static_cast<ExprASTNode>(BinaryASTNode(CurTok, op, std::make_unique<ExprASTNode>(lhs), std::make_unique<ExprASTNode>(rhs)));
     }
 
     return lhs;
@@ -603,7 +609,7 @@ static ParserFunction<ExprASTNode> rel_expr =
       getNextToken();
       auto rhs = rel_expr();
 
-      return (ExprASTNode) BinaryASTNode(CurTok, op, std::make_unique<ExprASTNode>(lhs), std::make_unique<ExprASTNode>(rhs));
+      return static_cast<ExprASTNode>(BinaryASTNode(CurTok, op, std::make_unique<ExprASTNode>(lhs), std::make_unique<ExprASTNode>(rhs)));
     }
 
     return lhs;
@@ -618,7 +624,7 @@ static ParserFunction<ExprASTNode> eq_expr =
       getNextToken();
       auto rhs = eq_expr();
 
-      return (ExprASTNode) BinaryASTNode(CurTok, op, std::make_unique<ExprASTNode>(lhs), std::make_unique<ExprASTNode>(rhs));
+      return static_cast<ExprASTNode>(BinaryASTNode(CurTok, op, std::make_unique<ExprASTNode>(lhs), std::make_unique<ExprASTNode>(rhs)));
     }
 
     return lhs;
@@ -632,25 +638,25 @@ static ParserFunction<ExprASTNode> and_expr =
       getNextToken();
       auto rhs = and_expr();
 
-      return (ExprASTNode) BinaryASTNode(CurTok, TOKEN_TYPE::AND, std::make_unique<ExprASTNode>(lhs), std::make_unique<ExprASTNode>(rhs));
+      return static_cast<ExprASTNode>(BinaryASTNode(CurTok, TOKEN_TYPE::AND, std::make_unique<ExprASTNode>(lhs), std::make_unique<ExprASTNode>(rhs)));
     }
 
     return lhs;
   };
 
-const inline static ParserFunction<ExprASTNode> or_expr = 
-  [](){
+inline static ExprASTNode or_expr()
+  {
     ExprASTNode lhs = and_expr();
 
     if(CurTok.type == TOKEN_TYPE::OR) {
       getNextToken();
       auto rhs = or_expr();
 
-      return (ExprASTNode) BinaryASTNode(CurTok, TOKEN_TYPE::OR, std::make_unique<ExprASTNode>(lhs), std::make_unique<ExprASTNode>(rhs));
+      return static_cast<ExprASTNode>(BinaryASTNode(CurTok, TOKEN_TYPE::OR, std::make_unique<ExprASTNode>(lhs), std::make_unique<ExprASTNode>(rhs)));
     }
 
     return lhs;
-  };
+  }
 
 #pragma endregion
 
@@ -658,6 +664,7 @@ const inline static ParserFunction<ExprASTNode> or_expr =
 /// Statement Parsing
 ///-----------------------------------------------------------------------------
 #pragma region Statement Parsing
+inline static StatementASTNode stmt();
 
 static ParserFunction<std::vector<std::unique_ptr<StatementASTNode>>> stmt_list =
   [](){
@@ -731,7 +738,7 @@ static ParserFunction<ReturnStmtASTNode> return_stmt =
     return ReturnStmtASTNode(std::move(exp));
   };
 
-inline static ParserFunction<AssignmentStmtASTNode> assign_stmt =
+static ParserFunction<AssignmentStmtASTNode> assign_stmt =
   [](){
     std::string name;
     std::unique_ptr<ExprASTNode> exp;
@@ -744,22 +751,24 @@ inline static ParserFunction<AssignmentStmtASTNode> assign_stmt =
     return AssignmentStmtASTNode(CurTok, name, std::move(exp));
   };
 
-inline static ParserFunction<StatementASTNode> stmt =
-  [](){
+inline static StatementASTNode stmt() {
     if(CurTok.type == TOKEN_TYPE::IF) {
-      return (StatementASTNode) if_stmt();
+      return static_cast<StatementASTNode>(if_stmt());
     } else if(CurTok.type == TOKEN_TYPE::WHILE) {
-      return (StatementASTNode) while_stmt();
+      return static_cast<StatementASTNode>(while_stmt());
     } else if(CurTok.type == TOKEN_TYPE::RETURN) {
-      return (StatementASTNode) return_stmt();
+      return static_cast<StatementASTNode>(return_stmt());
     } else if(CurTok.type == TOKEN_TYPE::LBRA) {
-      return (StatementASTNode) block();
+      return static_cast<StatementASTNode>(block());
     } else if(CurTok.type == TOKEN_TYPE::IDENT) {
-      return (StatementASTNode) assign_stmt();
+      return static_cast<StatementASTNode>(assign_stmt());
     } else if(CurTok.type == TOKEN_TYPE::SC) {
-      return (StatementASTNode) EmptyStatementASTNode();
+      return static_cast<StatementASTNode>(EmptyStatementASTNode());
     }
-  };
+
+  //TODO: error;
+  return EmptyStatementASTNode();
+}
 #pragma endregion
 
 
@@ -785,6 +794,8 @@ static ParserFunction<std::vector<std::unique_ptr<FunctionParameterASTNode>>> fu
       params.push_back(std::make_unique<FunctionParameterASTNode>(param_decl()));
       getNextToken();
     }
+
+    return params;
   };
 
 static ParserFunction<ExternFunctionDeclASTNode> extern_decl = 
@@ -801,7 +812,7 @@ static ParserFunction<ExternFunctionDeclASTNode> extern_decl =
     expect(TOKEN_TYPE::LPAR);
     params = func_params();
     expect(TOKEN_TYPE::RPAR);
-    expect(TOKEN_TYPE::SC);
+    expect(TOKEN_TYPE::SC); 
 
     return ExternFunctionDeclASTNode(name, std::move(params), type);
   };
@@ -842,7 +853,7 @@ static ParserFunction<DeclASTNode> decl =
       name = ident();
       getNextToken();
       if(CurTok.type == TOKEN_TYPE::SC) {
-        return (DeclASTNode) VariableDeclASTNode(CurTok, name, (VariableType) type);
+        return static_cast<DeclASTNode>(VariableDeclASTNode(CurTok, name, (VariableType) type));
       }
     }
 
@@ -850,7 +861,7 @@ static ParserFunction<DeclASTNode> decl =
     params = func_params();
     expect(TOKEN_TYPE::RPAR);
 
-    return (DeclASTNode) FunctionDeclASTNode(name, std::move(params), std::make_unique<BlockAstNode>(block()), type);
+    return static_cast<DeclASTNode>(FunctionDeclASTNode(name, std::move(params), std::make_unique<BlockAstNode>(block()), type));
   };
 
 static ParserFunction<std::unique_ptr<VariableDeclASTNode>> local_decl =
@@ -883,19 +894,19 @@ static void parser() {
 // Code Generation
 //===----------------------------------------------------------------------===//
 
-static LLVMContext TheContext;
-static IRBuilder<> Builder(TheContext);
-static std::unique_ptr<Module> TheModule;
+// static LLVMContext TheContext;
+// static IRBuilder<> Builder(TheContext);
+// static std::unique_ptr<Module> TheModule;
 
 //===----------------------------------------------------------------------===//
 // AST Printer
 //===----------------------------------------------------------------------===//
 
-inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
-                                     const ASTNode &ast) {
-  os << ast.to_string();
-  return os;
-}
+// inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+//                                      const ASTNode &ast) {
+//   os << ast.to_string();
+//   return os;
+// }
 
 //===----------------------------------------------------------------------===//
 // Main driver code.
@@ -912,8 +923,8 @@ int main(int argc, char **argv) {
   }
 
   // initialize line number and column numbers to zero
-  lineNo = 1;
-  columnNo = 1;
+  //lineNo = 1;
+  //columnNo = 1;
 
   // get the first token
   getNextToken();
@@ -925,7 +936,7 @@ int main(int argc, char **argv) {
   fprintf(stderr, "Lexer Finished\n");
 
   // Make the module, which holds all the code.
-  TheModule = std::make_unique<Module>("mini-c", TheContext);
+  //TheModule = std::make_unique<Module>("mini-c", TheContext);
 
   // Run the parser now.
   parser();
@@ -933,16 +944,16 @@ int main(int argc, char **argv) {
 
   //********************* Start printing final IR **************************
   // Print out all of the generated code into a file called output.ll
-  auto Filename = "output.ll";
-  std::error_code EC;
-  raw_fd_ostream dest(Filename, EC, sys::fs::OF_None);
+  // auto Filename = "output.ll";
+  // std::error_code EC;
+  // raw_fd_ostream dest(Filename, EC, sys::fs::OF_None);
 
-  if (EC) {
-    errs() << "Could not open file: " << EC.message();
-    return 1;
-  }
+  // if (EC) {
+  //   errs() << "Could not open file: " << EC.message();
+  //   return 1;
+  // }
   // TheModule->print(errs(), nullptr); // print IR to terminal
-  TheModule->print(dest, nullptr);
+  //TheModule->print(dest, nullptr);
   //********************* End printing final IR ****************************
 
   fclose(pFile); // close the file that contains the code that was parsed

@@ -78,6 +78,6 @@
         int lineNo;
         int columnNo;
     };
-    static TOKEN gettok(FILE* pFile);
+    TOKEN gettok(FILE* pFile);
 
 #endif
