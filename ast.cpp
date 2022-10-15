@@ -22,7 +22,7 @@ public:
   virtual Value *codegen() = 0;
   virtual std::string to_string() const { return "ASTNode"; };
 
-  void print(int depth, std::string str = "")
+  virtual void print(int depth, std::string str = "")
   {
 
     std::string name = std::string(typeid(*this).name());
@@ -35,7 +35,7 @@ public:
     std::cout << std::endl;    
   }
 
-  void print_string(int depth, std::string str)
+  virtual void print_string(int depth, std::string str)
   {
     std::cout << std::string(depth, ' ') << str << std::endl;
   }
@@ -110,7 +110,7 @@ public:
       : Op(op), Operand(std::move(operand)), Tok(tok) {}
   virtual Value *codegen() { return nullptr; };
 
-  void print(int depth)
+  virtual void print(int depth)
   {
     ASTNode::print(depth);
     std::cout << "Op: " << Tok.lexeme << std::endl;
@@ -132,7 +132,7 @@ public:
                 std::unique_ptr<ASTNode> RHS)
       : Op(op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
   virtual Value *codegen() { return nullptr; };
-  void print(int depth)
+  virtual void print(int depth)
   {
     ASTNode::print(depth);
     std::cout << "Op: " << Tok.lexeme << std::endl;
@@ -152,7 +152,7 @@ class VariableRefASTNode : public ExprASTNode
 public:
   VariableRefASTNode(TOKEN tok, const std::string &Name) : Name(Name) {}
   virtual Value *codegen() { return nullptr; };
-  void print(int depth)
+  virtual void print(int depth)
   {
     ASTNode::print(depth);
     std::cout << Name << std::endl;
@@ -172,7 +172,7 @@ public:
               std::vector<std::unique_ptr<ExprASTNode>> Args)
       : tok(tok), FunctionName(funcName), Args(std::move(Args)) {}
   virtual Value *codegen() { return nullptr; };
-  void print(int depth)
+  virtual void print(int depth)
   {
     ASTNode::print(depth);
     std::cout << "FunctionName: " << FunctionName << std::endl;
@@ -195,7 +195,7 @@ public:
                     std::unique_ptr<ASTNode> RHS)
       : Name(Name), RHS(std::move(RHS)) {}
   virtual Value *codegen() { return nullptr; };
-  void print(int depth)
+  virtual void print(int depth)
   {
     ASTNode::print(depth);
     std::cout << "Name: " << Name << std::endl;
@@ -215,7 +215,7 @@ class ExprStatementASTNode : public StatementASTNode
 public:
   ExprStatementASTNode(std::unique_ptr<ExprASTNode> expr) : Expr(std::move(expr)) {}
   virtual Value *codegen() { return nullptr; };
-  void print(int depth)
+  virtual void print(int depth)
   {
     ASTNode::print(depth);
     Expr->print(depth + 1);
@@ -224,29 +224,29 @@ public:
 
 class VariableDeclASTNode;
 
-class BlockAstNode : public StatementASTNode
+class BlockASTNode : public StatementASTNode
 {
   std::vector<std::unique_ptr<VariableDeclASTNode>> Declarations;
   std::vector<std::unique_ptr<StatementASTNode>> Statements;
 
 public:
-  BlockAstNode(std::vector<std::unique_ptr<StatementASTNode>> statements) : Statements(std::move(statements)) {}
+  BlockASTNode(std::vector<std::unique_ptr<StatementASTNode>> statements) : Statements(std::move(statements)) {}
   virtual Value *codegen() { return nullptr; };
-  void print(int depth);
+  virtual void print(int depth);
 };
 
 class IfElseASTNode : public StatementASTNode
 {
   std::unique_ptr<ExprASTNode> Cond;
-  std::unique_ptr<BlockAstNode> Then;
-  std::unique_ptr<BlockAstNode> Else;
+  std::unique_ptr<BlockASTNode> Then;
+  std::unique_ptr<BlockASTNode> Else;
 
 public:
-  IfElseASTNode(std::unique_ptr<ExprASTNode> Cond, std::unique_ptr<BlockAstNode> Then,
-                std::unique_ptr<BlockAstNode> Else)
+  IfElseASTNode(std::unique_ptr<ExprASTNode> Cond, std::unique_ptr<BlockASTNode> Then,
+                std::unique_ptr<BlockASTNode> Else)
       : Cond(std::move(Cond)), Then(std::move(Then)), Else(std::move(Else)) {}
   virtual Value *codegen() { return nullptr; };
-  void print(int depth)
+  virtual void print(int depth)
   {
     ASTNode::print(depth);
     std::cout << "Cond: " << std::endl;
@@ -264,10 +264,10 @@ class WhileASTNode : public StatementASTNode
   std::unique_ptr<ASTNode> Body;
 
 public:
-  WhileASTNode(std::unique_ptr<ExprASTNode> Cond, std::unique_ptr<BlockAstNode> Body)
+  WhileASTNode(std::unique_ptr<ExprASTNode> Cond, std::unique_ptr<BlockASTNode> Body)
       : Cond(std::move(Cond)), Body(std::move(Body)) {}
   virtual Value *codegen() { return nullptr; };
-  void print(int depth)
+  virtual void print(int depth)
   {
     ASTNode::print(depth);
     std::cout << "Cond: " << std::endl;
@@ -284,7 +284,7 @@ class ReturnStmtASTNode : public StatementASTNode
 public:
   ReturnStmtASTNode(std::unique_ptr<ExprASTNode> expr) : Expr(std::move(expr)) {}
   virtual Value *codegen() { return nullptr; };
-  void print(int depth)
+  virtual void print(int depth)
   {
     ASTNode::print(depth);
     Expr->print(depth + 1);
@@ -302,7 +302,7 @@ public:
                         std::unique_ptr<ASTNode> RHS)
       : Name(Name), RHS(std::move(RHS)) {}
   virtual Value *codegen() { return nullptr; };
-  void print(int depth)
+  virtual void print(int depth)
   {
     ASTNode::print(depth, "Name: " + Name);
     ASTNode::print_string(depth, "RHS: ");
@@ -338,14 +338,14 @@ class VariableDeclASTNode : public DeclASTNode
 public:
   VariableDeclASTNode(TOKEN tok, const std::string &Name, VariableType type) : Name(std::move(Name)), Type(type) {}
   virtual Value *codegen() { return nullptr; };
-  void print(int depth)
+  virtual void print(int depth)
   {
     ASTNode::print(depth, "Name: " + Name);
     //std::cout << "Type: " << Type. << std::endl;
   }
 };
 
-void BlockAstNode::print(int depth)
+void BlockASTNode::print(int depth)
   {
     ASTNode::print(depth);
     ASTNode::print_string(depth, "Declarations: ");
@@ -373,16 +373,16 @@ class FunctionDeclASTNode : public DeclASTNode
 {
   std::string Name;
   std::vector<std::unique_ptr<FunctionParameterASTNode>> Args;
-  std::unique_ptr<BlockAstNode> Body;
+  std::unique_ptr<BlockASTNode> Body;
   TypeSpecType ReturnType;
 
 public:
   FunctionDeclASTNode(std::string Name,
                       std::vector<std::unique_ptr<FunctionParameterASTNode>> Args,
-                      std::unique_ptr<BlockAstNode> Body, TypeSpecType returnType)
+                      std::unique_ptr<BlockASTNode> Body, TypeSpecType returnType)
       : Name(Name), Args(std::move(Args)), Body(std::move(Body)), ReturnType(returnType) {}
   virtual Value *codegen() { return nullptr; };
-  void print(int depth)
+  virtual void print(int depth)
   {
     ASTNode::print(depth, "Name: " + Name);
     ASTNode::print_string(depth, "Args: ");
@@ -408,7 +408,7 @@ public:
                             TypeSpecType returnType)
       : Name(Name), Args(std::move(Args)), ReturnType(returnType) {}
   virtual Value *codegen() { return nullptr; };
-  void print(int depth)
+  virtual void print(int depth)
   {
     ASTNode::print(depth, "Name: " + Name);
     ASTNode::print_string(depth, "Args: ");
@@ -430,7 +430,7 @@ public:
                  std::vector<std::unique_ptr<DeclASTNode>> Declarations)
       : ExternDeclarations(std::move(ExternDeclarations)), Declarations(std::move(Declarations)) {}
   virtual Value *codegen() { return nullptr; };
-  void print(int depth)
+  virtual void print(int depth)
   {
     ASTNode::print(depth);
     ASTNode::print_string(depth, "ExternDeclarations: ");

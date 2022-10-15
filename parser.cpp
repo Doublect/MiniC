@@ -399,7 +399,7 @@ static ParserFunction<std::vector<std::unique_ptr<DeclASTNode>>> local_decl_list
     return decls;
   };
 
-static ParserFunction<BlockAstNode> block = 
+static ParserFunction<BlockASTNode> block = 
   [](){
     std::vector<std::unique_ptr<DeclASTNode>> decls;
     std::vector<std::unique_ptr<StatementASTNode>> statements;
@@ -411,23 +411,23 @@ static ParserFunction<BlockAstNode> block =
 
     expect(TOKEN_TYPE::RBRA);
 
-    return BlockAstNode(std::move(statements));
+    return BlockASTNode(std::move(statements));
   };
 
 static ParserFunction<IfElseASTNode> if_stmt =
   [](){
     std::unique_ptr<ExprASTNode> condition;
-    std::unique_ptr<BlockAstNode> then_branch;
-    std::unique_ptr<BlockAstNode> else_branch;
+    std::unique_ptr<BlockASTNode> then_branch;
+    std::unique_ptr<BlockASTNode> else_branch;
 
     expect(TOKEN_TYPE::IF);
     expect(TOKEN_TYPE::LPAR);
     condition = std::make_unique<ExprASTNode>(expr());
     expect(TOKEN_TYPE::RPAR);
-    then_branch = std::make_unique<BlockAstNode>(block());
+    then_branch = std::make_unique<BlockASTNode>(block());
     if(CurTok.type == TOKEN_TYPE::ELSE) {
       getNextToken();
-      else_branch = std::make_unique<BlockAstNode>(block());
+      else_branch = std::make_unique<BlockASTNode>(block());
     }
 
     return IfElseASTNode(std::move(condition), std::move(then_branch), std::move(else_branch));
@@ -436,13 +436,13 @@ static ParserFunction<IfElseASTNode> if_stmt =
 static ParserFunction<WhileASTNode> while_stmt =
   [](){
     std::unique_ptr<ExprASTNode> condition;
-    std::unique_ptr<BlockAstNode> body;
+    std::unique_ptr<BlockASTNode> body;
 
     expect(TOKEN_TYPE::WHILE);
     expect(TOKEN_TYPE::LPAR);
     condition = std::make_unique<ExprASTNode>(expr());
     expect(TOKEN_TYPE::RPAR);
-    body = std::make_unique<BlockAstNode>(block());
+    body = std::make_unique<BlockASTNode>(block());
 
     return WhileASTNode(std::move(condition), std::move(body));
   };
@@ -576,7 +576,7 @@ static ParserFunction<DeclASTNode> decl =
     params = func_params();
     expect(TOKEN_TYPE::RPAR);
 
-    return static_cast<DeclASTNode>(FunctionDeclASTNode(name, std::move(params), std::make_unique<BlockAstNode>(block()), type));
+    return static_cast<DeclASTNode>(FunctionDeclASTNode(name, std::move(params), std::make_unique<BlockASTNode>(block()), type));
   };
 
 static ParserFunction<std::vector<std::unique_ptr<DeclASTNode>>> decl_list =
