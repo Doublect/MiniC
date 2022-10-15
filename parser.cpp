@@ -3,7 +3,7 @@
 #include<vector>
 
 #include "ast.cpp"
-#include "lexer.hpp"
+#include "lexer.cpp"
 
 static FILE *pFile;
 
@@ -38,6 +38,17 @@ static bool isExternListFirst() {
   return CurTok.type == TOKEN_TYPE::EXTERN;
 }
 
+static bool isExprFirst() {
+  return  CurTok.type == TOKEN_TYPE::IDENT
+    || CurTok.type == TOKEN_TYPE::INT_LIT
+    || CurTok.type == TOKEN_TYPE::FLOAT_LIT
+    || CurTok.type == TOKEN_TYPE::BOOL_LIT
+    || CurTok.type == TOKEN_TYPE::SC
+    || CurTok.type == TOKEN_TYPE::LPAR
+    || CurTok.type == TOKEN_TYPE::MINUS
+    || CurTok.type == TOKEN_TYPE::NOT;
+}
+
 static bool isVarTypeFirst() {
   return CurTok.type == TOKEN_TYPE::INT_TOK || CurTok.type == TOKEN_TYPE::FLOAT_TOK || CurTok.type == TOKEN_TYPE::BOOL_TOK;
 }
@@ -62,6 +73,9 @@ static bool isStmtFirst() {
     || CurTok.type == TOKEN_TYPE::INT_LIT
     || CurTok.type == TOKEN_TYPE::FLOAT_LIT
     || CurTok.type == TOKEN_TYPE::BOOL_LIT
+    || CurTok.type == TOKEN_TYPE::INT_TOK
+    || CurTok.type == TOKEN_TYPE::FLOAT_TOK
+    || CurTok.type == TOKEN_TYPE::BOOL_TOK
     || CurTok.type == TOKEN_TYPE::IDENT
     || CurTok.type == TOKEN_TYPE::RETURN;
 }
@@ -78,8 +92,8 @@ inline static ExprASTNode or_expr();
 /// Parser Errors
 ///----------------------------------------------------------------------------
 /// LogError* - These are little helper functions for error handling.
-static std::unique_ptr<ASTNode> LogError(const char *Str) {
-  fprintf(stderr, "LogError: %s\n", Str);
+static std::unique_ptr<ASTNode> LogError(std::string Str) {
+  fprintf(stderr, "LogError: %s\n", Str.c_str());
   return nullptr;
 }
 
@@ -117,7 +131,7 @@ static ParserFunction<std::string> ident =
 
 static void expect(TOKEN_TYPE type) {
   if(CurTok.type != type) {
-    LogError("Expected token");
+    LogError(std::string("Expected token") + std::to_string(type) + " but got " + std::to_string(CurTok.type));
     return;
   }
   getNextToken();
@@ -189,17 +203,7 @@ static ParserFunction<ExprASTNode> literals =
     //TODO: ERROR
   };
 
-static ParserFunction<ExprASTNode> expr = 
-  [](){
-    if(CurTok.type == TOKEN_TYPE::IDENT) {
-      std::string varName = ident();
-      getNextToken();
-      expect(TOKEN_TYPE::EQ);
-      return static_cast<ExprASTNode>(AssignmentASTNode(CurTok, std::move(varName), std::move(std::make_unique<ExprASTNode>(expr()))));
-    } 
-
-    return static_cast<ExprASTNode>(or_expr());
-  };
+static ParserFunction<ExprASTNode> expr = or_expr;
 
 static ParserFunction<std::vector<std::unique_ptr<ExprASTNode>>> args = 
   [](){
@@ -244,11 +248,14 @@ static ParserFunction<ExprASTNode> primary_expr =
 
 static ParserFunction<ExprASTNode> parentheses_expr = 
   [](){
-    expect(TOKEN_TYPE::LPAR);
-    ExprASTNode expr = primary_expr();
-    expect(TOKEN_TYPE::RPAR);
+    if(CurTok.type == TOKEN_TYPE::LPAR) {
+      getNextToken();
+      ExprASTNode expr = primary_expr();
+      expect(TOKEN_TYPE::RPAR);
+      return expr;
+    }
 
-    return expr;
+    return primary_expr();
   };
 
 static ParserFunction<ExprASTNode> unary_expr = 
@@ -370,15 +377,37 @@ static ParserFunction<std::vector<std::unique_ptr<StatementASTNode>>> stmt_list 
     return statements;
   };
 
+static ParserFunction<std::unique_ptr<VariableDeclASTNode>> local_decl =
+  [](){
+    VariableType type = var_type();
+    getNextToken();
+    const std::string value = ident();
+    getNextToken();
+    expect(TOKEN_TYPE::SC);
+
+    return std::make_unique<VariableDeclASTNode>(VariableDeclASTNode(CurTok, value, type));
+  };
+
+static ParserFunction<std::vector<std::unique_ptr<DeclASTNode>>> local_decl_list =
+  [](){
+    std::vector<std::unique_ptr<DeclASTNode>> decls;
+
+    while(isVarTypeFirst()) {
+      decls.push_back(local_decl());
+    }
+
+    return decls;
+  };
+
 static ParserFunction<BlockAstNode> block = 
   [](){
+    std::vector<std::unique_ptr<DeclASTNode>> decls;
     std::vector<std::unique_ptr<StatementASTNode>> statements;
 
     expect(TOKEN_TYPE::LBRA);
 
-    while(CurTok.type != TOKEN_TYPE::RBRA) {
-       statements = stmt_list();
-    }
+    decls = local_decl_list();
+    statements = stmt_list();
 
     expect(TOKEN_TYPE::RBRA);
 
@@ -453,12 +482,13 @@ inline static StatementASTNode stmt() {
       return static_cast<StatementASTNode>(return_stmt());
     } else if(CurTok.type == TOKEN_TYPE::LBRA) {
       return static_cast<StatementASTNode>(block());
-    } else if(CurTok.type == TOKEN_TYPE::IDENT) {
-      return static_cast<StatementASTNode>(assign_stmt());
-    } else if(CurTok.type == TOKEN_TYPE::SC) {
-      return static_cast<StatementASTNode>(EmptyStatementASTNode());
+    } else if(isExprFirst()) {
+      StatementASTNode stmt = static_cast<StatementASTNode>(expr());
+      expect(TOKEN_TYPE::SC);
+      return stmt;
     }
 
+  getNextToken();
   //TODO: error;
   return EmptyStatementASTNode();
 }
@@ -522,13 +552,6 @@ static ParserFunction<std::vector<std::unique_ptr<ExternFunctionDeclASTNode>>> e
     return func_decls;
   };
 
-static ParserFunction<std::vector<std::unique_ptr<FunctionDeclASTNode>>> decl_list =
- []() {
-  std::vector<std::unique_ptr<FunctionDeclASTNode>> func_decls;
-  //TODO: hello;
-  return func_decls;
- };
-
 static ParserFunction<DeclASTNode> decl =
  [](){
     std::string name;
@@ -549,7 +572,6 @@ static ParserFunction<DeclASTNode> decl =
         return static_cast<DeclASTNode>(VariableDeclASTNode(CurTok, name, (VariableType) type));
       }
     }
-
     expect(TOKEN_TYPE::LPAR);
     params = func_params();
     expect(TOKEN_TYPE::RPAR);
@@ -557,12 +579,13 @@ static ParserFunction<DeclASTNode> decl =
     return static_cast<DeclASTNode>(FunctionDeclASTNode(name, std::move(params), std::make_unique<BlockAstNode>(block()), type));
   };
 
-static ParserFunction<std::unique_ptr<VariableDeclASTNode>> local_decl =
-  [](){
-    VariableType type = var_type();
-    getNextToken();
-    const std::string value = ident(); 
-    expect(TOKEN_TYPE::SC);
+static ParserFunction<std::vector<std::unique_ptr<DeclASTNode>>> decl_list =
+ []() {
+  std::vector<std::unique_ptr<DeclASTNode>> func_decls;
+  
+  while(isTypeSpecFirst()) {
+    func_decls.push_back(std::make_unique<DeclASTNode>(decl()));
+  }
 
-    return std::make_unique<VariableDeclASTNode>(VariableDeclASTNode(CurTok, value, type));
-  };
+  return func_decls;
+ };

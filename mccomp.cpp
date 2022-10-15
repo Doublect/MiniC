@@ -35,26 +35,26 @@
 #include <utility>
 #include <vector>
 
-#include "lexer.cpp"
+#include "lexer.hpp"
 #include "parser.cpp"
 
 using namespace llvm;
 //using namespace llvm::sys;
 
 // program ::= extern_list decl_list
-static void parser() {
+static ProgramASTNode parser() {
   // Make sure we are at the beginning of the program
   fseek(pFile, 0, SEEK_SET);
 
   getNextToken();
 
   std::vector<std::unique_ptr<ExternFunctionDeclASTNode>> extern_func_decls;
+  std::vector<std::unique_ptr<DeclASTNode>> decls;
 
   extern_func_decls = extern_list();
+  decls = decl_list();
 
-  if(isTypeSpecFirst()) {
-    //decl_list();
-  }
+  return ProgramASTNode(std::move(extern_func_decls), std::move(decls));
 }
 
 //===----------------------------------------------------------------------===//
@@ -94,19 +94,19 @@ int main(int argc, char **argv) {
   //columnNo = 1;
 
   // get the first token
-  getNextToken();
-  while (CurTok.type != EOF_TOK) {
-    fprintf(stderr, "Token: %s with type %d\n", CurTok.lexeme.c_str(),
-            CurTok.type);
-    getNextToken();
-  }
-  fprintf(stderr, "Lexer Finished\n");
+  // getNextToken();
+  // while (CurTok.type != EOF_TOK) {
+  //   fprintf(stderr, "Token: %s with type %d\n", CurTok.lexeme.c_str(),
+  //           CurTok.type);
+  //   getNextToken();
+  // }
+  // fprintf(stderr, "Lexer Finished\n");
 
   // Make the module, which holds all the code.
   //TheModule = std::make_unique<Module>("mini-c", TheContext);
 
   // Run the parser now.
-  parser();
+  parser().print(0);
   fprintf(stderr, "Parsing Finished\n");
 
   //********************* Start printing final IR **************************
