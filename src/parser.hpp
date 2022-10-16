@@ -7,7 +7,6 @@
   #include "ast.hpp"
   #include "lexer.hpp"
 
-  static FILE *pFile;
 
   TOKEN getNextToken();
 

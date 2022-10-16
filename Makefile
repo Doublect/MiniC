@@ -1,4 +1,4 @@
-CXX=clang++ -std=c++20
+CXX=clang++ -std=c++17
 CFLAGS= -g -O3 `llvm-config --cxxflags --ldflags --system-libs --libs all` -std=c++17 \
 -Wno-unused-function -Wno-unknown-warning-option 
 SRCF = src
