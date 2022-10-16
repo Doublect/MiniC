@@ -1,11 +1,6 @@
-#include <iostream>
-#include <string>
-#include <memory>
-#include <vector>
+#include "ast_print.hpp"
 
 #include "helpers.hpp"
-
-#include "ast_print.hpp"
 
 std::unique_ptr<ASTPrint> make_ast_print(std::string name, std::string var, std::vector<std::unique_ptr<ASTPrint>> &&children)
 {

@@ -6,8 +6,6 @@
 #include <memory>
 #include <vector>
 
-#include "helpers.hpp"
-
 class ASTPrint
 {
     std::string name;
@@ -19,7 +17,7 @@ public:
   ASTPrint(
       std::string name,
       std::string var,
-      std::vector<std::unique_ptr<ASTPrint>> &&children);
+      std::vector<std::unique_ptr<ASTPrint>> &&children) : name(name), var(var), children(std::move(children)) {}
 
   virtual void printAST(std::string indent = "", bool last = false)
   {
