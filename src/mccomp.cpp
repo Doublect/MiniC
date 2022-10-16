@@ -35,27 +35,12 @@
 #include <utility>
 #include <vector>
 
+#include "ast.hpp"
 #include "lexer.hpp"
-#include "parser.cpp"
+#include "parser.hpp"
 
 using namespace llvm;
 //using namespace llvm::sys;
-
-// program ::= extern_list decl_list
-static ProgramASTNode parser() {
-  // Make sure we are at the beginning of the program
-  fseek(pFile, 0, SEEK_SET);
-
-  getNextToken();
-
-  std::vector<std::unique_ptr<ExternFunctionDeclASTNode>> extern_func_decls;
-  std::vector<std::unique_ptr<DeclASTNode>> decls;
-
-  extern_func_decls = extern_list();
-  decls = decl_list();
-
-  return ProgramASTNode(std::move(extern_func_decls), std::move(decls));
-}
 
 //===----------------------------------------------------------------------===//
 // Code Generation
@@ -106,7 +91,7 @@ int main(int argc, char **argv) {
   //TheModule = std::make_unique<Module>("mini-c", TheContext);
 
   // Run the parser now.
-  parser().print(0);
+  parser().to_ast_print()->printAST();
   fprintf(stderr, "Parsing Finished\n");
 
   //********************* Start printing final IR **************************

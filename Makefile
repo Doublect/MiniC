@@ -1,9 +1,19 @@
-CXX=clang++ -std=c++17
-CFLAGS= -g -O3 `llvm-config --cxxflags --ldflags --system-libs --libs all` \
--Wno-unused-function -Wno-unknown-warning-option
+CXX=clang++ -std=c++20
+CFLAGS= -g -O3 `llvm-config --cxxflags --ldflags --system-libs --libs all` -std=c++17 \
+-Wno-unused-function -Wno-unknown-warning-option 
+SRCF = src
+BUILDF = build
+DEPS = $(BUILDF)/ast.o $(BUILDF)/helpers.o $(BUILDF)/lexer.o $(BUILDF)/parser.o
 
-mccomp: mccomp.cpp
-	$(CXX) mccomp.cpp $(CFLAGS) -o mccomp
+mccomp: $(SRCF)/mccomp.cpp $(DEPS)
+	$(CXX) $^ $(CFLAGS) -o mccomp
+
+$(BUILDF)/%.o: $(SRCF)/%.cpp $(SRCF)/%.hpp $(BUILDF)
+	$(CXX) $< -c -o $@ -g -O3
+
+$(BUILDF):
+	mkdir -p build
 
 clean:
-	rm -rf mccomp 
+	rm -rf build
+	rm -f mccomp

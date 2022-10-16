@@ -1,16 +1,9 @@
+import ast;
 #include<deque>
-#include<memory>
-#include<vector>
 
-#include "ast.cpp"
-#include "lexer.cpp"
+#include "parser.hpp"
 
-static FILE *pFile;
-
-template <typename Base, typename Derived> std::unique_ptr<Base> unique_ptr_cast(Derived &&p) {
-  return std::unique_ptr<Base>(std::make_unique<Derived>(std::move(p)));
-}
-
+#include "helpers.hpp"
 
 //===----------------------------------------------------------------------===//
 // Parser
@@ -22,7 +15,7 @@ template <typename Base, typename Derived> std::unique_ptr<Base> unique_ptr_cast
 static TOKEN CurTok;
 static std::deque<TOKEN> tok_buffer;
 
-static inline TOKEN getNextToken() {
+TOKEN getNextToken() {
 
   if (tok_buffer.size() == 0)
     tok_buffer.push_back(gettok(pFile));
@@ -79,8 +72,6 @@ static bool isIdent() {
   return CurTok.type == TOKEN_TYPE::IDENT;
 }
 
-template<typename T> using ParserFunction = std::function<T()>;
-
 inline static std::unique_ptr<ExprASTNode> or_expr();
 
 ///----------------------------------------------------------------------------
@@ -94,7 +85,7 @@ static std::unique_ptr<ASTNode> LogError(std::string Str) {
 
 //using ParserFunction = std::function<ASTNode()>;
 
-static ParserFunction<TypeSpecType> type_spec = 
+ParserFunction<TypeSpecType> type_spec = 
   [](){
     if(isTypeSpecFirst()) {
       return (TypeSpecType) CurTok.type;
@@ -104,7 +95,7 @@ static ParserFunction<TypeSpecType> type_spec =
     return TypeSpecType::VOID;
   };
 
-static ParserFunction<VariableType> var_type = 
+ParserFunction<VariableType> var_type = 
   [](){
     if(isVarTypeFirst()) {
       return (VariableType) CurTok.type;
@@ -359,6 +350,7 @@ inline static std::unique_ptr<ExprASTNode> or_expr()
 /// Statement Parsing
 ///-----------------------------------------------------------------------------
 #pragma region Statement Parsing
+
 inline static std::unique_ptr<StatementASTNode> stmt();
 
 static ParserFunction<std::vector<std::unique_ptr<StatementASTNode>>> stmt_list =
@@ -536,16 +528,15 @@ static ParserFunction<ExternFunctionDeclASTNode> extern_decl =
   };
 
 
-static ParserFunction<std::vector<std::unique_ptr<ExternFunctionDeclASTNode>>> extern_list = 
-  [](){
-    std::vector<std::unique_ptr<ExternFunctionDeclASTNode>> func_decls;
+static std::vector<std::unique_ptr<ExternFunctionDeclASTNode>> extern_list() { 
+  std::vector<std::unique_ptr<ExternFunctionDeclASTNode>> func_decls;
 
-    while(CurTok.type == TOKEN_TYPE::EXTERN) {
-      func_decls.push_back(std::make_unique<ExternFunctionDeclASTNode>(extern_decl()));
-    }
+  while(CurTok.type == TOKEN_TYPE::EXTERN) {
+    func_decls.push_back(std::make_unique<ExternFunctionDeclASTNode>(extern_decl()));
+  }
 
-    return func_decls;
-  };
+  return func_decls;
+}
 
 static ParserFunction<std::unique_ptr<DeclASTNode>> decl =
  []() -> std::unique_ptr<DeclASTNode> {
@@ -568,16 +559,7 @@ static ParserFunction<std::unique_ptr<DeclASTNode>> decl =
       }
     }
     expect(TOKEN_TYPE::LPAR);
-    params = func_params();vector<std::string> vars;
-  std::vector<ASTPrint> children;
-
-public :
-  ASTPrint(
-    std::string &&name,
-    std::vector<std::string> &&vars, 
-    std::vector<ASTPrint> &&children = std::vector<ASTPrint>()) {
-    this->name = name;
-    this->vars = vars;
+    params = func_params();
     expect(TOKEN_TYPE::RPAR);
 
     return std::unique_ptr<DeclASTNode>(
@@ -585,8 +567,7 @@ public :
     );
   };
 
-static ParserFunction<std::vector<std::unique_ptr<DeclASTNode>>> decl_list =
- []() {
+std::vector<std::unique_ptr<DeclASTNode>> decl_list() {
   std::vector<std::unique_ptr<DeclASTNode>> func_decls;
   
   while(isTypeSpecFirst()) {
@@ -594,4 +575,17 @@ static ParserFunction<std::vector<std::unique_ptr<DeclASTNode>>> decl_list =
   }
 
   return func_decls;
- };
+}
+
+// program ::= extern_list decl_list
+ProgramASTNode parser() {
+  // Make sure we are at the beginning of the program
+  fseek(pFile, 0, SEEK_SET);
+
+  getNextToken();
+
+  std::vector<std::unique_ptr<ExternFunctionDeclASTNode>> extern_func_decls = extern_list();
+  std::vector<std::unique_ptr<DeclASTNode>> decls = decl_list();
+
+  return ProgramASTNode(std::move(extern_func_decls), std::move(decls));
+}
