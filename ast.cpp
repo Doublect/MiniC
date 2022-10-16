@@ -14,6 +14,75 @@ using namespace llvm;
 // AST nodes
 //===----------------------------------------------------------------------===//
 #pragma region AST
+
+class ASTPrintEntry {
+  std::string name;
+  std::string var;
+  std::vector<ASTPrintEntry> children;
+
+  void print(std::string indent, bool last = false) {
+    std::cout << indent << (last ? "└─" : "├─") << name << " " << var << std::endl;
+  }
+};
+
+class ASTPrint {
+  std::string name;
+  std::vector<std::string> vars;
+  std::vector<ASTPrint> children;
+
+public :
+  ASTPrint(
+    std::string &&name,
+    std::vector<std::string> &&vars, 
+    std::vector<ASTPrint> &&children = std::vector<ASTPrint>()) {
+    this->name = name;
+    this->vars = vars;
+    this->children = children;
+  }
+
+  void printAST(std::string indent, bool last = false) {
+    std::cout << indent << (last ? "└──" : "├── ") << name << " " << vars[0] << std::endl;
+
+    indent = indent + (last ? "  " : "│ ");
+
+    //TODO: vars
+    for (int i = 0; i < this->children.size() - 1; i++) {
+      this->children[i].printAST(indent, false);
+    }
+    this->children.back().printAST(indent, true);
+  }
+};
+
+static std::pair<std::string, ASTPrint> make_pair(std::string name, ASTPrint ast) {
+  return std::make_pair(name, ast);
+};
+
+static std::string indent(int level, int begin) {
+  std::string s;
+  for (int i = 0; i < level; i++) {
+    s += "│ ";
+  }
+  for (int i = 0; i < begin; i++) {
+    s += "└─";
+  }
+
+  return s;
+}
+
+static std::string indent(std::string &s) {
+  s.append("│ ");
+}
+
+static std::string deindent(std::string &s) {
+  s.erase(s.length() - 2);
+}
+
+static std::string indentWrapper(std::string s, std::function<void()> fn) {
+  indent(s);
+  fn();
+  deindent(s);
+}
+
 /// ASTNode - Base class for all AST nodes.
 class ASTNode
 {
@@ -22,22 +91,27 @@ public:
   virtual Value *codegen() = 0;
   virtual std::string to_string() const { return "ASTNode"; };
 
-  virtual void print(int depth, std::string str = "")
+
+  virtual ASTPrint to_ast_print() {
+    return ASTPrint(std::vector<std::string>(), std::vector<std::pair<std::string, ASTPrint>>());
+  }
+
+  virtual void print(std::string indent, std::string str = "", bool last = false)
   {
 
     std::string name = std::string(typeid(*this).name());
     name.erase(std::remove_if(name.begin(), name.end(), [](char c) { return std::isdigit(c); }), name.end());
 
-    std::cout << std::string(depth * 2, ' ') << name << std::endl;
+    std::cout << indent << (last ? "└─" : "├─") << name;
     if(str != "")
       std::cout << " " << str;
 
     std::cout << std::endl;    
   }
 
-  virtual void print_string(int depth, std::string str)
+  virtual void print_string(std::string indent, std::string str, bool last = false)
   {
-    std::cout << std::string(depth, ' ') << str << std::endl;
+    std::cout << indent << (last ? "└─" : "├─") << str << std::endl;
   }
 };
 
@@ -46,6 +120,7 @@ class StatementASTNode : public ASTNode
 public:
   StatementASTNode() {}
   virtual Value *codegen() { return nullptr; };
+  virtual void print(std::string indent) { ASTNode::print(indent, ""); };
 };
 
 class ExprASTNode : public StatementASTNode
@@ -53,6 +128,7 @@ class ExprASTNode : public StatementASTNode
 public:
   ExprASTNode() {}
   virtual Value *codegen() { return nullptr; };
+  virtual void print(std::string indent) { ASTNode::print(indent, ""); };
 };
 
 /// AST representation of an integer number
@@ -65,6 +141,11 @@ class IntASTNode : public ExprASTNode
 public:
   IntASTNode(TOKEN tok, int val) : Val(val), Tok(tok) {}
   virtual Value *codegen() { return nullptr; };
+  virtual ASTPrint to_ast_print() { 
+    return ASTPrint(
+      std::vector<std::string>({std::to_string(Val)}), std::vector<std::pair<std::string, ASTPrint>>()
+    );
+  };
   // virtual std::string to_string() const override {
   // return a sting representation of this AST node
   //};
@@ -80,6 +161,9 @@ class BoolASTNode : public ExprASTNode
 public:
   BoolASTNode(TOKEN tok, bool val) : Val(val), Tok(tok) {}
   virtual Value *codegen() { return nullptr; };
+  virtual ASTPrint to_ast_print() { 
+    return ASTPrint(std::vector<std::string>({std::to_string(Val)}), std::vector<std::pair<std::string, ASTPrint>>());
+  };
 };
 
 /// AST representation of a float literal
@@ -92,6 +176,9 @@ class FloatASTNode : public ExprASTNode
 public:
   FloatASTNode(TOKEN tok, float val) : Val(val), Tok(tok) {}
   virtual Value *codegen() { return nullptr; };
+  virtual ASTPrint to_ast_print() { 
+    return ASTPrint(std::vector<std::string>({std::to_string(Val)}), std::vector<std::pair<std::string, ASTPrint>>());
+  };
 };
 
 ///----------------------------------------------------------------------------
@@ -101,46 +188,38 @@ public:
 class UnaryASTNode : public ExprASTNode
 {
   TOKEN_TYPE Op;
-  std::unique_ptr<ASTNode> Operand;
+  std::unique_ptr<ExprASTNode> Operand;
 
   TOKEN Tok;
 
 public:
-  UnaryASTNode(TOKEN tok, TOKEN_TYPE op, std::unique_ptr<ASTNode> operand)
+  UnaryASTNode(TOKEN tok, TOKEN_TYPE op, std::unique_ptr<ExprASTNode> operand)
       : Op(op), Operand(std::move(operand)), Tok(tok) {}
   virtual Value *codegen() { return nullptr; };
 
-  virtual void print(int depth)
-  {
-    ASTNode::print(depth);
-    std::cout << "Op: " << Tok.lexeme << std::endl;
-    Operand->print(depth + 1);
-  }
+  virtual ASTPrint to_ast_print() { 
+    return ASTPrint(std::vector<std::string>({"Op: " + Tok.lexeme}), std::vector<std::pair<std::string, ASTPrint>>({make_pair("", Operand->to_ast_print())}));
+  };
 };
 
 /// AST representation of a binary expression
 class BinaryASTNode : public ExprASTNode
 {
   TOKEN_TYPE Op;
-  std::unique_ptr<ASTNode> LHS, RHS;
+  std::unique_ptr<ExprASTNode> LHS, RHS;
 
   TOKEN Tok;
   std::string Name;
 
 public:
-  BinaryASTNode(TOKEN tok, TOKEN_TYPE op, std::unique_ptr<ASTNode> LHS,
-                std::unique_ptr<ASTNode> RHS)
+  BinaryASTNode(TOKEN tok, TOKEN_TYPE op, std::unique_ptr<ExprASTNode> LHS,
+                std::unique_ptr<ExprASTNode> RHS)
       : Op(op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
   virtual Value *codegen() { return nullptr; };
-  virtual void print(int depth)
-  {
-    ASTNode::print(depth);
-    std::cout << "Op: " << Tok.lexeme << std::endl;
-    std::cout << "LHS: " << std::endl;
-    LHS->print(depth + 1);
-    std::cout << "RHS: " << std::endl;
-    RHS->print(depth + 1);
-  }
+
+  virtual ASTPrint to_ast_print() { 
+    return ASTPrint(std::vector<std::string>({"Op: " + Tok.lexeme}), std::vector<std::pair<std::string, ASTPrint>>({make_pair("LHS: ", LHS->to_ast_print()), make_pair("RHS:", RHS->to_ast_print())}));
+  };
 };
 
 /// AST representation of a variable reference
@@ -154,8 +233,7 @@ public:
   virtual Value *codegen() { return nullptr; };
   virtual void print(int depth)
   {
-    ASTNode::print(depth);
-    std::cout << Name << std::endl;
+    ASTNode::print(depth, Name);
   }
 };
 
@@ -174,9 +252,8 @@ public:
   virtual Value *codegen() { return nullptr; };
   virtual void print(int depth)
   {
-    ASTNode::print(depth);
-    std::cout << "FunctionName: " << FunctionName << std::endl;
-    std::cout << "Args: " << std::endl;
+    ASTNode::print(depth, "FunctionName: " + FunctionName);
+    ASTNode::print_string(depth + 1, "Args: ");
     for (auto &arg : Args)
     {
       arg->print(depth + 1);
@@ -187,19 +264,18 @@ public:
 class AssignmentASTNode : public ExprASTNode
 {
   std::string Name;
-  std::unique_ptr<ASTNode> RHS;
+  std::unique_ptr<ExprASTNode> RHS;
   TOKEN Tok;
 
 public:
   AssignmentASTNode(TOKEN tok, const std::string &Name,
-                    std::unique_ptr<ASTNode> RHS)
+                    std::unique_ptr<ExprASTNode> RHS)
       : Name(Name), RHS(std::move(RHS)) {}
   virtual Value *codegen() { return nullptr; };
   virtual void print(int depth)
   {
-    ASTNode::print(depth);
-    std::cout << "Name: " << Name << std::endl;
-    std::cout << "RHS: " << std::endl;
+    ASTNode::print(depth, "Name: " + Name);
+    ASTNode::print_string(depth + 1, "RHS: ");    
     RHS->print(depth + 1);
   }
 };
@@ -233,6 +309,20 @@ public:
   BlockASTNode(std::vector<std::unique_ptr<StatementASTNode>> statements) : Statements(std::move(statements)) {}
   virtual Value *codegen() { return nullptr; };
   virtual void print(int depth);
+  // virtual void print(int depth)
+  // {
+  //   ASTNode::print(depth);
+  //   ASTNode::print_string(depth, "Declarations: ");
+  //   for (auto &decl : Declarations)
+  //   {
+  //     decl->print(depth + 1);
+  //   }
+  //   ASTNode::print_string(depth, "Statements: ");
+  //   for (auto &stmt : Statements)
+  //   {
+  //     stmt->print(depth + 1);
+  //   }
+  // }
 };
 
 class IfElseASTNode : public StatementASTNode
@@ -249,11 +339,11 @@ public:
   virtual void print(int depth)
   {
     ASTNode::print(depth);
-    std::cout << "Cond: " << std::endl;
+    ASTNode::print_string(depth, "Cond: ");
     Cond->print(depth + 1);
-    std::cout << "Then: " << std::endl;
+    ASTNode::print_string(depth, "Then: ");
     Then->print(depth + 1);
-    std::cout << "Else: " << std::endl;
+    ASTNode::print_string(depth, "Else: ");
     Else->print(depth + 1);
   }
 };
@@ -261,7 +351,7 @@ public:
 class WhileASTNode : public StatementASTNode
 {
   std::unique_ptr<ExprASTNode> Cond;
-  std::unique_ptr<ASTNode> Body;
+  std::unique_ptr<BlockASTNode> Body;
 
 public:
   WhileASTNode(std::unique_ptr<ExprASTNode> Cond, std::unique_ptr<BlockASTNode> Body)
@@ -270,9 +360,9 @@ public:
   virtual void print(int depth)
   {
     ASTNode::print(depth);
-    std::cout << "Cond: " << std::endl;
+    ASTNode::print_string(depth, "Cond: ");
     Cond->print(depth + 1);
-    std::cout << "Body: " << std::endl;
+    ASTNode::print_string(depth, "Body: ");
     Body->print(depth + 1);
   }
 };
@@ -294,12 +384,12 @@ public:
 class AssignmentStmtASTNode : public StatementASTNode
 {
   std::string Name;
-  std::unique_ptr<ASTNode> RHS;
+  std::unique_ptr<ExprASTNode> RHS;
   TOKEN Tok;
 
 public:
   AssignmentStmtASTNode(TOKEN tok, const std::string &Name,
-                        std::unique_ptr<ASTNode> RHS)
+                        std::unique_ptr<ExprASTNode> RHS)
       : Name(Name), RHS(std::move(RHS)) {}
   virtual Value *codegen() { return nullptr; };
   virtual void print(int depth)
@@ -327,6 +417,10 @@ class DeclASTNode : public ASTNode
 public:
   DeclASTNode() {}
   virtual Value *codegen() { return nullptr; };
+  virtual void print(int depth)
+  {
+    ASTNode::print(depth);
+  }
 };
 
 class VariableDeclASTNode : public DeclASTNode
