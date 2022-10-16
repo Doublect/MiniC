@@ -1,13 +1,7 @@
 #include "llvm/IR/Value.h"
 
-#include <iostream>
-#include <string>
-#include <vector>
+#include "ast_print.hpp"
 
-#include "helpers.hpp"
-#include "lexer.hpp"
-
-#include "ast.hpp"
 
 using namespace llvm;
 
@@ -16,92 +10,6 @@ using namespace llvm;
 // AST nodes
 //===----------------------------------------------------------------------===//
 #pragma region AST
-
-
-ASTPrint::ASTPrint() {}
-ASTPrint::ASTPrint(
-      std::string name,
-      std::string var,
-      std::vector<std::unique_ptr<ASTPrint>> &&children) : name(name), var(var), children(std::move(children)) {}
-
-void ASTPrint::printAST(std::string indent = "", bool last = false)
-{
-std::cout << indent << (last ? "└─" : "├─") << name << " " << var << std::endl;
-
-indent = indent + (last ? "  " : "│ ");
-
-if (children.size() == 0)
-    return;
-
-// TODO: vars
-for (int i = 0; i < this->children.size() - 1; i++)
-{
-    children[i]->printAST(indent, false);
-}
-children.back()->printAST(indent, true);
-}
-
-static std::unique_ptr<ASTPrint> make_ast_print(std::string name, std::string var, std::vector<std::unique_ptr<ASTPrint>> &&children)
-{
-  return std::make_unique<ASTPrint>(ASTPrint(name, var, std::move(children)));
-}
-
-ASTPrintChildren::ASTPrintChildren(
-    std::string name,
-    std::vector<std::unique_ptr<ASTPrint>> &&children) : name(name), children(std::move(children)) {}
-
-void ASTPrintChildren::printAST(std::string indent, bool last)
-{
-std::cout << indent << (last ? "└─" : "├─") << name << std::endl;
-
-indent = indent + (last ? "  " : "│ ");
-
-if (children.size() == 0)
-    return;
-
-for (int i = 0; i < this->children.size() - 1; i++)
-{
-    this->children[i]->printAST(indent, false);
-}
-this->children.back()->printAST(indent, true);
-}
-
-static std::unique_ptr<ASTPrint> make_ast_children(std::string name, std::vector<std::unique_ptr<ASTPrint>> &&children)
-{
-  return unique_ptr_cast<ASTPrint>(ASTPrintChildren(name, std::move(children)));
-}
-
-
-ASTPrintLabelled::ASTPrintLabelled(
-    std::string name,
-    std::unique_ptr<ASTPrint> &&child) : name(name), child(std::move(child)) {}
-
-void ASTPrintLabelled::printAST(std::string indent, bool last)
-{
-std::cout << indent << (last ? "└─" : "├─") << name << std::endl;
-
-indent = indent + (last ? "  " : "│ ");
-
-child->printAST(indent, true);
-}
-
-static std::unique_ptr<ASTPrint> make_ast_labelled(std::string name, std::unique_ptr<ASTPrint> &&child)
-{
-  return unique_ptr_cast<ASTPrint>(ASTPrintLabelled(name, std::move(child)));
-}
-
-ASTPrintLeaf::ASTPrintLeaf(
-    std::string name) : name(name) {};
-
-void ASTPrintLeaf::printAST(std::string indent, bool last)
-{
-    std::cout << indent << (last ? "└─" : "├─") << name << std::endl;
-}
-
-std::unique_ptr<ASTPrint> make_ast_leaf(std::string name)
-{
-  return unique_ptr_cast<ASTPrint>(ASTPrintLeaf(name));
-}
 
 template <typename T>
 static std::vector<std::unique_ptr<ASTPrint>> map_printer(const std::vector<std::unique_ptr<T>> &nodes)

@@ -1,19 +1,8 @@
 #ifndef AST_H
 #define AST_H
-    enum class VariableType {
-        INT = -2,
-        FLOAT = -4,
-        BOOL = -5,
-    };
+    
 
-    enum TypeSpecType {
-        INT = -2,
-        VOID = -3,
-        FLOAT = -4,
-        BOOL = -5,
-    };
-
-    #include "llvm/IR/Value.h"
+#include "llvm/IR/Value.h"
 
 #include <iostream>
 #include <string>
@@ -24,58 +13,18 @@
 
 using namespace llvm;
 
-class ASTPrint
-{
-    std::string name;
-    std::string var;
-    std::vector<std::unique_ptr<ASTPrint>> children;
-
-public:
-  ASTPrint();
-  ASTPrint(
-      std::string name,
-      std::string var,
-      std::vector<std::unique_ptr<ASTPrint>> &&children);
-
-  virtual void printAST(std::string indent = "", bool last = false);
+enum class VariableType {
+    INT = -2,
+    FLOAT = -4,
+    BOOL = -5,
 };
 
-class ASTPrintChildren : public ASTPrint
-{
-  std::string name;
-  std::vector<std::unique_ptr<ASTPrint>> children;
-
-public:
-  ASTPrintChildren(
-      std::string name,
-      std::vector<std::unique_ptr<ASTPrint>> &&children);
-  virtual void printAST(std::string indent, bool last = false);
+enum TypeSpecType {
+    INT = -2,
+    VOID = -3,
+    FLOAT = -4,
+    BOOL = -5,
 };
-
-class ASTPrintLabelled : public ASTPrint
-{
-  std::string name;
-  std::unique_ptr<ASTPrint> child;
-
-public:
-  ASTPrintLabelled(
-      std::string name,
-      std::unique_ptr<ASTPrint> &&child);
-
-  virtual void printAST(std::string indent, bool last = false);
-};
-
-class ASTPrintLeaf : public ASTPrint
-{
-  std::string name;
-
-public:
-  ASTPrintLeaf(std::string name);
-
-  virtual void printAST(std::string indent, bool last = false);
-};
-
-std::unique_ptr<ASTPrint> make_ast_leaf(std::string name);
 
 //===----------------------------------------------------------------------===//
 // AST nodes
@@ -399,9 +348,41 @@ std::unique_ptr<ASTPrint> make_ast_leaf(std::string name);
 // #pragma endregion
 #pragma endregion
 
+#pragma endregion
+#pragma endregion
+
+class ASTNode;
+class StatementASTNode;
+class IntASTNode;
+class BoolASTNode;
+class FloatASTNode;
+
+class ExprASTNode;
+// Exprs
+class UnaryASTNode;
+class BinaryASTNode;
+class VariableRefASTNode;
+class CallExprAST;
+class AssignmentASTNode;
+
+// Stmts
+class ExprStatementASTNode;
+class BlockASTNode;
+class IfElseASTNode;
+class WhileASTNode;
+class ReturnStmtASTNode;
+class AssignmentStmtASTNode;
+class EmptyStatementASTNode;
+
+// Decls
+
+class DeclASTNode;
+class VariableDeclASTNode;
+class FunctionParameterASTNode;
+class FunctionDeclASTNode;
+class ExternFunctionDeclASTNode;
+class ProgramASTNode;
 
 #include "ast.cpp"
-#pragma endregion
-#pragma endregion
 
 #endif

@@ -1,4 +1,3 @@
-import ast;
 #include<deque>
 
 #include "parser.hpp"
