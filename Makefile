@@ -3,7 +3,7 @@ CFLAGS= -g -O3 `llvm-config --cxxflags --ldflags --system-libs --libs all` -std=
 -Wno-unused-function -Wno-unknown-warning-option 
 SRCF = src
 BUILDF = build
-DEPS = $(BUILDF)/ast.o $(BUILDF)/ast_print.o $(BUILDF)/helpers.o $(BUILDF)/lexer.o $(BUILDF)/parser.o
+DEPS = $(BUILDF)/ast.o $(BUILDF)/ast_print.o $(BUILDF)/code_gen.o $(BUILDF)/helpers.o $(BUILDF)/lexer.o $(BUILDF)/parser.o
 
 mccomp: $(SRCF)/mccomp.cpp $(DEPS)
 	$(CXX) $^ $(CFLAGS) -o mccomp

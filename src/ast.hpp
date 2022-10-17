@@ -459,7 +459,7 @@ class IntASTNode : public ExprASTNode
 
 public:
   IntASTNode(TOKEN tok, int val) : Val(val), Tok(tok) {}
-  virtual Value *codegen() { return nullptr; };
+  virtual Value *codegen();
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
     return make_ast_print(
@@ -472,25 +472,6 @@ public:
   //};
 };
 
-/// AST representation of a boolean value
-class BoolASTNode : public ExprASTNode
-{
-  bool Val;
-  TOKEN Tok;
-  std::string Name;
-
-public:
-  BoolASTNode(TOKEN tok, bool val) : Val(val), Tok(tok) {}
-  virtual Value *codegen() { return nullptr; };
-  virtual std::unique_ptr<ASTPrint> to_ast_print()
-  {
-    return make_ast_print(
-        "BoolASTNode",
-        std::to_string(Val),
-        std::move(std::vector<std::unique_ptr<ASTPrint>>()));
-  };
-};
-
 /// AST representation of a float literal
 class FloatASTNode : public ExprASTNode
 {
@@ -500,11 +481,30 @@ class FloatASTNode : public ExprASTNode
 
 public:
   FloatASTNode(TOKEN tok, float val) : Val(val), Tok(tok) {}
-  virtual Value *codegen() { return nullptr; };
+  virtual Value *codegen();
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
     return make_ast_print(
         "FloatASTNode",
+        std::to_string(Val),
+        std::move(std::vector<std::unique_ptr<ASTPrint>>()));
+  };
+};
+
+/// AST representation of a boolean value
+class BoolASTNode : public ExprASTNode
+{
+  bool Val;
+  TOKEN Tok;
+  std::string Name;
+
+public:
+  BoolASTNode(TOKEN tok, bool val) : Val(val), Tok(tok) {}
+  virtual Value *codegen();
+  virtual std::unique_ptr<ASTPrint> to_ast_print()
+  {
+    return make_ast_print(
+        "BoolASTNode",
         std::to_string(Val),
         std::move(std::vector<std::unique_ptr<ASTPrint>>()));
   };
@@ -524,7 +524,7 @@ class UnaryASTNode : public ExprASTNode
 public:
   UnaryASTNode(TOKEN tok, TOKEN_TYPE op, std::unique_ptr<ExprASTNode> operand)
       : Op(op), Operand(std::move(operand)), Tok(tok) {}
-  virtual Value *codegen() { return nullptr; };
+  virtual Value *codegen();
 
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
@@ -552,7 +552,7 @@ public:
   BinaryASTNode(TOKEN tok, TOKEN_TYPE op, std::unique_ptr<ExprASTNode> LHS,
                 std::unique_ptr<ExprASTNode> RHS)
       : Op(op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
-  virtual Value *codegen() { return nullptr; };
+  virtual Value *codegen();
 
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
@@ -598,7 +598,7 @@ public:
   CallExprAST(TOKEN tok, const std::string &funcName,
               std::vector<std::unique_ptr<ExprASTNode>> Args)
       : tok(tok), FunctionName(funcName), Args(std::move(Args)) {}
-  virtual Value *codegen() { return nullptr; };
+  virtual Value *codegen();
 
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
