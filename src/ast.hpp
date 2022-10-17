@@ -410,7 +410,7 @@ public:
 
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
-    return make_ast_print("", "", std::move(std::vector<std::unique_ptr<ASTPrint>>(0)));
+    return make_ast_print("", "", std::move(std::vector<std::unique_ptr<ASTPrint>>()));
   }
 
   virtual void print(std::string indent, std::string str = "", bool last = false)
@@ -465,7 +465,7 @@ public:
     return make_ast_print(
         "IntASTNode",
         std::to_string(Val),
-        std::move(std::vector<std::unique_ptr<ASTPrint>>(0)));
+        std::move(std::vector<std::unique_ptr<ASTPrint>>()));
   };
   // virtual std::string to_string() const override {
   // return a sting representation of this AST node
@@ -528,7 +528,7 @@ public:
 
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
-    auto children = std::vector<std::unique_ptr<ASTPrint>>(1);
+    auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
     children.push_back(std::move(Operand->to_ast_print()));
     return make_ast_print( 
@@ -556,7 +556,7 @@ public:
 
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
-    auto children = std::vector<std::unique_ptr<ASTPrint>>(2);
+    auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
     children.push_back(std::move(make_ast_labelled("LHS: ", LHS->to_ast_print())));
     children.push_back(std::move(make_ast_labelled("RHS: ", RHS->to_ast_print())));
@@ -602,7 +602,7 @@ public:
 
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
-    auto children = std::vector<std::unique_ptr<ASTPrint>>(1);
+    auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
     children.push_back(std::move(make_ast_print("Args:", "", map_printer(Args))));
 
@@ -627,7 +627,7 @@ public:
   virtual Value *codegen() { return nullptr; };
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
-    auto children = std::vector<std::unique_ptr<ASTPrint>>(1);
+    auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
     children.push_back(std::move(make_ast_labelled("RHS:", RHS->to_ast_print())));
 
@@ -653,7 +653,7 @@ public:
 
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
-    auto children = std::vector<std::unique_ptr<ASTPrint>>(1);
+    auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
     children.push_back(std::move(make_ast_labelled("Expr:", Expr->to_ast_print())));
 
@@ -677,7 +677,7 @@ public:
   virtual Value *codegen() { return nullptr; };
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
-    auto children = std::vector<std::unique_ptr<ASTPrint>>(1);
+    auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
     children.push_back(std::move(make_ast_children("Declarations:", std::move(map_printer(Declarations)))));
     children.push_back(std::move(make_ast_children("Statements:", std::move(map_printer(Statements)))));
@@ -703,7 +703,7 @@ public:
   virtual Value *codegen() { return nullptr; };
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
-    auto children = std::vector<std::unique_ptr<ASTPrint>>(3);
+    auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
     children.push_back(std::move(make_ast_labelled("Cond:", Cond->to_ast_print())));
     children.push_back(std::move(make_ast_labelled("Then:", Then->to_ast_print())));
@@ -729,7 +729,7 @@ public:
 
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
-    auto children = std::vector<std::unique_ptr<ASTPrint>>(2);
+    auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
     children.push_back(std::move(make_ast_labelled("Cond:", Cond->to_ast_print())));
     children.push_back(std::move(make_ast_labelled("Body:", Body->to_ast_print())));
@@ -752,7 +752,7 @@ public:
 
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
-    auto children = std::vector<std::unique_ptr<ASTPrint>>(1);
+    auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
     children.push_back(std::move(make_ast_labelled("Expr:", Expr->to_ast_print())));
 
@@ -777,7 +777,7 @@ public:
   virtual Value *codegen() { return nullptr; };
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
-    auto children = std::vector<std::unique_ptr<ASTPrint>>(1);
+    auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
     children.push_back(std::move(make_ast_labelled("RHS:", RHS->to_ast_print())));
 
@@ -870,7 +870,7 @@ public:
 
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
-    auto children = std::vector<std::unique_ptr<ASTPrint>>(3);
+    auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
     children.push_back(std::move(make_ast_children("Args:", std::move(map_printer(Args)))));
     children.push_back(std::move(make_ast_labelled("Body:", Body->to_ast_print())));
@@ -899,7 +899,7 @@ public:
 
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
-    auto children = std::vector<std::unique_ptr<ASTPrint>>(2);
+    auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
     children.push_back(std::move(make_ast_children("Args:", std::move(map_printer(Args)))));
     children.push_back(std::move(make_ast_leaf("ReturnType: " + std::to_string(ReturnType))));
@@ -925,7 +925,7 @@ public:
 
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
-    auto children = std::vector<std::unique_ptr<ASTPrint>>(2);
+    auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
     children.push_back(std::move(make_ast_children("ExternDeclarations:", std::move(map_printer(ExternDeclarations)))));
     children.push_back(std::move(make_ast_children("Declarations:", std::move(map_printer(Declarations)))));

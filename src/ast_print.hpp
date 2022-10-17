@@ -31,9 +31,9 @@ public:
     // TODO: vars
     for (int i = 0; i < this->children.size() - 1; i++)
     {
-        children[i]->printAST(indent, false);
+        children[i].get()->printAST(indent, false);
     }
-    children.back()->printAST(indent, true);
+    children.back().get()->printAST(indent, true);
   }
 };
 
@@ -58,9 +58,9 @@ public:
 
     for (int i = 0; i < this->children.size() - 1; i++)
     {
-        this->children[i]->printAST(indent, false);
+        this->children[i].get()->printAST(indent, false);
     }
-    this->children.back()->printAST(indent, true);
+    this->children.back().get()->printAST(indent, true);
   }
 };
 
@@ -80,7 +80,7 @@ public:
 
     indent = indent + (last ? "  " : "│ ");
 
-    child->printAST(indent, true);
+    child.get()->printAST(indent, true);
   }
 
 };
