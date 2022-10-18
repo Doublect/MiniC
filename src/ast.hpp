@@ -558,8 +558,8 @@ public:
   {
     auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
-    children.push_back(std::move(make_ast_labelled("LHS: ", LHS->to_ast_print())));
-    children.push_back(std::move(make_ast_labelled("RHS: ", RHS->to_ast_print())));
+    children.push_back(std::move(LHS->to_ast_print()));
+    children.push_back(std::move(RHS->to_ast_print()));
 
     return make_ast_print(
         "BinaryASTNode",
@@ -576,7 +576,7 @@ class VariableRefASTNode : public ExprASTNode
 
 public:
   VariableRefASTNode(TOKEN tok, const std::string &Name) : Name(Name) {}
-  virtual Value *codegen() { return nullptr; };
+  virtual Value *codegen();
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
     return make_ast_print(
@@ -629,7 +629,7 @@ public:
   {
     auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
-    children.push_back(std::move(make_ast_labelled("RHS:", RHS->to_ast_print())));
+    children.push_back(std::move(RHS->to_ast_print()));
 
     return make_ast_print(
         "AssignmentASTNode",
@@ -655,7 +655,7 @@ public:
   {
     auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
-    children.push_back(std::move(make_ast_labelled("Expr:", Expr->to_ast_print())));
+    children.push_back(std::move(Expr->to_ast_print()));
 
     return make_ast_print(
         "ExprStatementASTNode",
@@ -707,6 +707,7 @@ public:
 
     children.push_back(std::move(make_ast_labelled("Cond:", Cond->to_ast_print())));
     children.push_back(std::move(make_ast_labelled("Then:", Then->to_ast_print())));
+    // TODO: Check if else has body
     children.push_back(std::move(make_ast_labelled("Else:", Else->to_ast_print())));
 
     return make_ast_print(
@@ -779,10 +780,10 @@ public:
   {
     auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
-    children.push_back(std::move(make_ast_labelled("RHS:", RHS->to_ast_print())));
+    children.push_back(std::move(RHS->to_ast_print()));
 
     return make_ast_print(
-        "WhileASTNode",
+        "AssignmentStmt",
         "Name: " + Name,
         std::move(children)
         );
