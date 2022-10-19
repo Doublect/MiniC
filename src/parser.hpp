@@ -6,14 +6,14 @@
 
   #include "ast.hpp"
   #include "lexer.hpp"
-
+  #include "helpers.hpp"
 
   TOKEN getNextToken();
 
-  template<typename T> using ParserFunction = std::function<T()>;
+  template<typename T> using ParserFunction = std::function<ResultMonad<T>()>;
 
-  std::vector<std::unique_ptr<DeclASTNode>> decl_list();
-  static std::vector<std::unique_ptr<ExternFunctionDeclASTNode>> extern_list();
+  ResultMonad<std::vector<std::unique_ptr<DeclASTNode>>> decl_list();
+  static ResultMonad<std::vector<std::unique_ptr<ExternFunctionDeclASTNode>>> extern_list();
 
-  ProgramASTNode parser();
+  ResultMonad<ProgramASTNode> parser();
 #endif

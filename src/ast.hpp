@@ -48,7 +48,7 @@ enum TypeSpecType {
 // };
 
 // template <typename T>
-// static std::vector<std::unique_ptr<ASTPrint>> map_printer(const std::vector<std::unique_ptr<T>> &nodes);
+// static std::vector<std::unique_ptr<ASTPrint>> map_printer(std::vector<std::unique_ptr<T>> &nodes);
 
 // class StatementASTNode : public ASTNode
 // {
@@ -390,7 +390,7 @@ class ProgramASTNode;
 #pragma region AST
 
 template <typename T>
-static std::vector<std::unique_ptr<ASTPrint>> map_printer(const std::vector<std::unique_ptr<T>> &nodes)
+static std::vector<std::unique_ptr<ASTPrint>> map_printer(std::vector<std::unique_ptr<T>> &nodes)
 {
   std::vector<std::unique_ptr<ASTPrint>> asts;
   for (auto &node : nodes)
@@ -669,11 +669,13 @@ class VariableDeclASTNode;
 
 class BlockASTNode : public StatementASTNode
 {
-  std::vector<std::unique_ptr<VariableDeclASTNode>> Declarations;
+  std::vector<std::unique_ptr<DeclASTNode>> Declarations;
   std::vector<std::unique_ptr<StatementASTNode>> Statements;
 
 public:
-  BlockASTNode(std::vector<std::unique_ptr<StatementASTNode>> statements) : Statements(std::move(statements)) {}
+  BlockASTNode(std::vector<std::unique_ptr<DeclASTNode>> &&declarations,
+    std::vector<std::unique_ptr<StatementASTNode>> &&statements) 
+    : Declarations(std::move(declarations)), Statements(std::move(statements)) {}
   virtual Value *codegen() { return nullptr; };
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
@@ -780,7 +782,7 @@ public:
   {
     auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
-    children.push_back(std::move(RHS->to_ast_print()));
+    children.push_back(RHS->to_ast_print());
 
     return make_ast_print(
         "AssignmentStmt",
@@ -800,7 +802,7 @@ public:
     return make_ast_print(
         "EmptyStatementASTNode",
         "",
-        std::move(std::vector<std::unique_ptr<ASTPrint>>())
+        std::vector<std::unique_ptr<ASTPrint>>()
         );
   }
 };
@@ -820,7 +822,7 @@ public:
     return make_ast_print(
         "",
         "",
-        std::move(std::vector<std::unique_ptr<ASTPrint>>())
+        std::vector<std::unique_ptr<ASTPrint>>()
         );
   }
 };
@@ -840,9 +842,9 @@ public:
     return make_ast_print(
         "VariableDeclASTNode",
         "Name: " + Name,
-        std::move(std::vector<std::unique_ptr<ASTPrint>>(
+        std::vector<std::unique_ptr<ASTPrint>>(
             // ASTPrintLeaf("Type: " + std::to_string(Type)),
-        )));
+        ));
   }
 };
 
@@ -873,9 +875,9 @@ public:
   {
     auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
-    children.push_back(std::move(make_ast_children("Args:", std::move(map_printer(Args)))));
-    children.push_back(std::move(make_ast_labelled("Body:", Body->to_ast_print())));
-    children.push_back(std::move(make_ast_leaf("ReturnType: " + std::to_string(ReturnType))));
+    children.push_back(make_ast_children("Args:", map_printer(Args)));
+    children.push_back(make_ast_labelled("Body:", Body->to_ast_print()));
+    children.push_back(make_ast_leaf("ReturnType: " + std::to_string(ReturnType)));
 
     return make_ast_print(
         "FunctionDeclASTNode",
@@ -902,8 +904,8 @@ public:
   {
     auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
-    children.push_back(std::move(make_ast_children("Args:", std::move(map_printer(Args)))));
-    children.push_back(std::move(make_ast_leaf("ReturnType: " + std::to_string(ReturnType))));
+    children.push_back(make_ast_children("Args:", map_printer(Args)));
+    children.push_back(make_ast_leaf("ReturnType: " + std::to_string(ReturnType)));
 
     return make_ast_print(
         "ExternFunctionDeclASTNode",
@@ -928,8 +930,8 @@ public:
   {
     auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
-    children.push_back(std::move(make_ast_children("ExternDeclarations:", std::move(map_printer(ExternDeclarations)))));
-    children.push_back(std::move(make_ast_children("Declarations:", std::move(map_printer(Declarations)))));
+    children.push_back(make_ast_children("ExternDeclarations:", map_printer(ExternDeclarations)));
+    children.push_back(make_ast_children("Declarations:", map_printer(Declarations)));
 
     return make_ast_print(
         "ProgramASTNode",

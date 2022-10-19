@@ -30,6 +30,8 @@ extern LLVMContext TheContext;
 extern IRBuilder<> Builder;
 extern std::unique_ptr<Module> TheModule;
 
+extern int lineNo, columnNo;
+
 //===----------------------------------------------------------------------===//
 // AST Printer
 //===----------------------------------------------------------------------===//
@@ -58,7 +60,7 @@ int main(int argc, char **argv) {
   lineNo = 1;
   columnNo = 1;
 
-  // get the first token
+  //get the first token
   // getNextToken();
   // while (CurTok.type != EOF_TOK) {
   //   fprintf(stderr, "Token: %s with type %d\n", CurTok.lexeme.c_str(),
@@ -71,7 +73,7 @@ int main(int argc, char **argv) {
   TheModule = std::make_unique<Module>("mini-c", TheContext);
 
   // Run the parser now.
-  parser().to_ast_print()->printAST();
+  parser().unwrap().get()->to_ast_print()->printAST();
   fprintf(stderr, "Parsing Finished\n");
 
   //********************* Start printing final IR **************************

@@ -8,7 +8,6 @@
     static bool BoolVal;              // Filled in if BOOL_LIT
     static float FloatVal;            // Filled in if FLOAT_LIT
     static std::string StringVal;     // Filled in if String Literal
-    static int lineNo, columnNo;
 
     // The lexer returns one of these for known things.
     enum TOKEN_TYPE {
