@@ -658,9 +658,7 @@ ResultMonad<ProgramASTNode> parser() {
   getNextToken();
 
   Consume(std::vector<std::unique_ptr<ExternFunctionDeclASTNode>>, extern_func_decls, extern_list);
-  std::cout << "2" << std::endl;
   Consume(std::vector<std::unique_ptr<DeclASTNode>>, decls, decl_list);
-  std::cout << "3" << std::endl;
 
   return make_result(ProgramASTNode(std::move(*extern_func_decls.release()), std::move(*decls.release())));
 }

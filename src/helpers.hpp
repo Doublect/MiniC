@@ -74,7 +74,7 @@
             template<typename U>
                 requires(std::conjunction_v<std::is_convertible<T, U>>)
             constexpr operator ResultMonad<U>() {
-                std::cout << "Converted A" << std::endl;
+                //std::cout << "Converted A" << std::endl;
                 if(this->success_val) {
                     ResultMonad<U> res(std::move(val));
                     return std::move(res);
@@ -86,9 +86,8 @@
 
             template<typename U>
             constexpr operator ResultMonad<U>() {
-                //std::cout << "Pre: " << success() << std::endl;
                 ResultMonad<U> res(err, false);
-                std::cout << "Converted B: " << typeid(T).name() << " " << typeid(U).name()  << std::endl;
+                //std::cout << "Converted B: " << typeid(T).name() << " " << typeid(U).name()  << std::endl;
                 return std::move(res);
             }
     };
