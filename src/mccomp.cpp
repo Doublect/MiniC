@@ -74,7 +74,20 @@ int main(int argc, char **argv) {
   TheModule = std::make_unique<Module>("mini-c", TheContext);
   std::cout << "Parsing...\n";
   // Run the parser now.
-  parser().unwrap()->to_ast_print()->printAST();
+  auto res = parser();
+  std::cout << res.success() << std::endl;
+  if(!res.success()) {
+    std::cout << res.success() << std::endl;
+    std::cout << res.error().msg() << std::endl;
+
+    return 1;
+  } else {
+    std::cout << res.success() << std::endl;
+    std::cout << "Success" << std::endl;
+  }
+    // .unwrap()
+    // ->to_ast_print()
+    // ->printAST();
   fprintf(stderr, "Parsing Finished\n");
 
   //********************* Start printing final IR **************************

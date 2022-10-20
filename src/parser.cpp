@@ -1,30 +1,47 @@
 #include<deque>
 #include <memory>
 
+#include "helpers.hpp"
 #include "parser.hpp"
+
+#define BOOST_STACKTRACE_USE_ADDR2LINE
+#include <boost/stacktrace.hpp>
 
 FILE *pFile;
 
 extern int lineNo, columnNo;
 
+using namespace std::string_literals;
 
 //#define Consume(result) result.success() ? result.unwrap() : { return result; } 
 //#define Consume(variable, result) auto res = result(); if(res.success()) { auto variable = res.unwrap(); } else { return res; }
+  //std::cout << boost::stacktrace::stacktrace() << std::endl; 
 #define Consume(type, variable, result) \ 
-  ResultMonad variable; \
-  { auto res = result(); \
-  if(res.success()) { variable = res.unwrap(); } else { return res; }}
+  std::unique_ptr<type> variable; \
+  { ResultMonad<type> res = result(); \
+  if(res.success()) { variable = std::move(res).unwrap(); } else { return res; }}
 #define ConsumeAssign(type, variable, result) \ 
   { ResultMonad<type> res = result(); \
-  if(res.success()) { variable = res.unwrap(); } else { return res; }}
+  if(res.success()) { variable = std::move(res).unwrap(); } else { return res; }}
 
 #define ConsumeVal(type, variable, result) \ 
   type variable; \
   { ResultMonad<type> res = result(); \
-  if(res.success()) { variable = *res.unwrap().release(); } else { return res; }}
+  if(res.success()) { variable = *std::move(res).unwrap().release(); } else { return res; }}
 #define ConsumeAssignVal(type, variable, result) \ 
   { ResultMonad<type> res = result(); \
-  if(res.success()) { variable = *res.unwrap_val(); } else { return res; }}
+  if(res.success()) { variable = *std::move(res).unwrap_val(); } else { return res; }}
+
+#define LogError(string) \
+  return ResultMonad<void>(ErrorT(string));
+#define LogErrorType(string, type) \
+  return ResultMonad<type>(ErrorT(string));
+
+#define Expect(token_type) \
+  { \
+    ResultMonad<TOKEN> res = expect(token_type); \
+    if(!res.success()) { return res; } \
+  }
 
 //===----------------------------------------------------------------------===//
 // Parser
@@ -93,16 +110,16 @@ static bool isIdent() {
   return CurTok.type == TOKEN_TYPE::IDENT;
 }
 
-inline static auto or_expr();
+inline static ResultMonad<ExprASTNode> or_expr();
 
 ///----------------------------------------------------------------------------
 /// Parser Errors
 ///----------------------------------------------------------------------------
 /// LogError* - These are little helper functions for error handling.
-static std::unique_ptr<ASTNode> LogError(std::string Str) {
-  fprintf(stderr, "LogError: %s\n", Str.c_str());
-  return nullptr;
-}
+// static std::unique_ptr<ASTNode> LogError(std::string Str) {
+//   fprintf(stderr, "LogError: %s\n", Str.c_str());
+//   return nullptr;
+// }
 
 //using ParserFunction = std::function<ASTNode()>;
 
@@ -111,13 +128,13 @@ auto type_spec =
     if(isTypeSpecFirst()) {
       TypeSpecType tst = (TypeSpecType) CurTok.type;
       getNextToken();
-      return make_result(std::move(tst));
+      return ResultMonad(std::move(tst));
     }
 
     //TODO: error
-    LogError("Expected type specifier");
-    getNextToken();
-    return make_result(TypeSpecType::VOID);
+    LogErrorType("Expected type specifier, got: "s + std::to_string(CurTok.type) , TypeSpecType);
+    //getNextToken();
+    //return ResultMonad(TypeSpecType::VOID);
   };
 
 auto var_type = 
@@ -125,12 +142,12 @@ auto var_type =
     if(isVarTypeFirst()) {
       VariableType type = (VariableType) CurTok.type;
       getNextToken();
-      return make_result(std::move(type));
+      return ResultMonad(std::move(type));
     }
 
     getNextToken();
     //TODO: Error
-    return make_result(VariableType::INT);
+    return ResultMonad(VariableType::INT);
   };
 
 auto ident =
@@ -138,69 +155,76 @@ auto ident =
     if(CurTok.type == TOKEN_TYPE::IDENT) {
       std::string name = CurTok.lexeme;
       getNextToken();
-      return make_result(std::move(name));
+      return ResultMonad(std::move(name));
     }
     std::string name = CurTok.lexeme;
     getNextToken();
 
     //TODO: Error
-    return make_result(std::move(name));
+    return ResultMonad(std::move(name));
   };
 
 static auto token_type =
   [](){
     TOKEN_TYPE tp = (TOKEN_TYPE) CurTok.type;
     getNextToken();
-    return make_result(std::move(tp));
+    return ResultMonad(std::move(tp));
   };
 
-static void expect(TOKEN_TYPE type) {
+static ResultMonad<TOKEN> expect(TOKEN_TYPE type) {
   if(CurTok.type != type) {
-    LogError(std::string("Expected token ") + std::to_string(type) + " but got " + std::to_string(CurTok.type));
-    LogError(std::to_string(lineNo) + ":" + std::to_string(columnNo));
-    return;
+    auto str = std::string(std::string("Expected token ") + std::to_string(type) + std::string(" but got ") + std::to_string(CurTok.type));
+    std::cout << "str" << std::endl;
+    std::cout << str << std::endl;
+    return ResultMonad<TOKEN>(ErrorT(str));
+    //LogError(std::string(std::string("Expected token ") + std::to_string(type) + std::string(" but got ") + std::to_string(CurTok.type)));
+    //LogError(std::to_string(lineNo) + ":" + std::to_string(columnNo));
   }
+  //std::cout << "Read token: " << CurTok.type << std::endl;
+  TOKEN tok = CurTok;
+  auto a = ResultMonad(std::move(tok));
   getNextToken();
+  return std::move(a);
 }
 
-static std::vector<TOKEN> matchPattern(std::vector<TOKEN_TYPE> &pattern) {
-  std::vector<TOKEN> tokens;
+// static std::vector<TOKEN> matchPattern(std::vector<TOKEN_TYPE> &pattern) {
+//   std::vector<TOKEN> tokens;
 
-  for(auto token_type: pattern) {
-    expect(token_type);
-    tokens.push_back(CurTok);
-    getNextToken();
-  }
+//   for(auto token_type: pattern) {
+//     Expect(token_type);
+//     tokens.push_back(CurTok);
+//     getNextToken();
+//   }
 
-  return tokens;
-}
+//   return tokens;
+// }
 
-static VariableType coerceVarType(TOKEN_TYPE type) {
-  if(isVarTypeFirst()) {
-    return (VariableType) type;
-  }
+// static VariableType coerceVarType(TOKEN_TYPE type) {
+//   if(isVarTypeFirst()) {
+//     return (VariableType) type;
+//   }
   
-  //TODO: Error
-  LogError("Invalid variable type");
-  return VariableType::INT;
-}
+//   //TODO: Error
+//   LogError("Invalid variable type"s);
+//   return VariableType::INT;
+// }
 
-static TypeSpecType coerceTypeSpec(TOKEN_TYPE type) {
-  if(isTypeSpecFirst()) {
-    return (TypeSpecType) type;
-  }
+// static ResultMonad<TypeSpecType> coerceTypeSpec(TOKEN_TYPE type) {
+//   if(isTypeSpecFirst()) {
+//     return (TypeSpecType) type;
+//   }
 
-  //TODO: Error
-  LogError("Invalid type specifier");
-  return TypeSpecType::VOID;
-}
+//   //TODO: Error
+//   LogError("Invalid type specifier"s);
+//   return TypeSpecType::VOID;
+// }
 
-static void coerceIdent() {
-  int type = CurTok.type;
-  if(type != TOKEN_TYPE::IDENT) {
-    LogError("Expected identifier");
-  }
-}
+// static void coerceIdent() {
+//   int type = CurTok.type;
+//   if(type != TOKEN_TYPE::IDENT) {
+//     LogError("Expected identifier");
+//   }
+// }
 
 ///-----------------------------------------------------------------------------
 /// Expression Parsing
@@ -214,33 +238,37 @@ static auto literals =
       getNextToken();
 
       //return ResultMonad(unique_ptr_cast<ExprASTNode>(IntASTNode(CurTok, value)));
-      return make_result(unique_ptr_cast<ExprASTNode>(IntASTNode(CurTok, value)));
+      return ResultMonad(unique_ptr_cast<ExprASTNode>(IntASTNode(CurTok, value)));
     } else if(CurTok.type == TOKEN_TYPE::FLOAT_LIT) {
       float value = FloatVal;
       getNextToken();
 
       // return ResultMonad(unique_ptr_cast<ExprASTNode>(FloatASTNode(CurTok, value)));
-      return make_result(unique_ptr_cast<ExprASTNode>(FloatASTNode(CurTok, value)));
+      return ResultMonad(unique_ptr_cast<ExprASTNode>(FloatASTNode(CurTok, value)));
     } else { //if(CurTok.type == TOKEN_TYPE::BOOL_LIT)
       bool value = BoolVal;
       getNextToken();
 
-      return make_result(unique_ptr_cast<ExprASTNode>(BoolASTNode(CurTok, value)));
+      return ResultMonad(unique_ptr_cast<ExprASTNode>(BoolASTNode(CurTok, value)));
     }
 
     //TODO: ERROR
   };
 
-static auto expr = or_expr;
+static ParserFunction<ExprASTNode> expr = or_expr;
 
 //ParserFunction<std::vector<std::unique_ptr<ExprASTNode>>>
-static auto args = 
-  []() {
-    expect(TOKEN_TYPE::LPAR);
+static ParserFunction<std::vector<std::unique_ptr<ExprASTNode>>> args = 
+  []() -> ResultMonad<std::vector<std::unique_ptr<ExprASTNode>>> {
+    Expect(TOKEN_TYPE::LPAR);
     std::vector<std::unique_ptr<ExprASTNode>> args;
 
     if(CurTok.type != TOKEN_TYPE::RPAR) {
-      Consume(ExprASTNode, arg, expr);
+      //Consume(ExprASTNode, arg, expr);
+
+      std::unique_ptr<ExprASTNode> arg;
+    { ResultMonad<ExprASTNode> res = expr();
+      if(res.success()) { arg = std::move(res).unwrap(); } else { return ResultMonad<std::vector<std::unique_ptr<ExprASTNode>>>(res.error()); }}
       args.push_back(std::move(arg));
     }
 
@@ -250,13 +278,13 @@ static auto args =
       args.push_back(std::move(arg));
     }
 
-    expect(TOKEN_TYPE::RPAR);
+    Expect(TOKEN_TYPE::RPAR);
 
     return ResultMonad(std::move(args));
   };
 
-static auto primary_expr = 
-  []() {
+static ParserFunction<ExprASTNode> primary_expr = 
+  []() -> ResultMonad<ExprASTNode> {
     if(CurTok.type == TOKEN_TYPE::IDENT) {
       ConsumeVal(std::string, varName, ident);
 
@@ -268,29 +296,29 @@ static auto primary_expr =
       if(CurTok.type == TOKEN_TYPE::ASSIGN) {
         getNextToken();
         Consume(ExprASTNode, node, expr);
-        return unique_ptr_cast<ExprASTNode>(AssignmentASTNode(CurTok, std::move(varName), std::move(node)));
+        return ResultMonad(unique_ptr_cast<ExprASTNode>(AssignmentASTNode(CurTok, std::move(varName), std::move(node))));
       }
 
-      return unique_ptr_cast<ExprASTNode>(VariableRefASTNode(CurTok, std::move(varName)));
+      return ResultMonad(unique_ptr_cast<ExprASTNode>(VariableRefASTNode(CurTok, std::move(varName))));
     } else {
       return literals();
     }
   };
 
 
-static auto parentheses_expr = 
-  []() {
+static ParserFunction<ExprASTNode> parentheses_expr = 
+  []() -> ResultMonad<ExprASTNode> {
     if(CurTok.type == TOKEN_TYPE::LPAR) {
       getNextToken();
       Consume(ExprASTNode, primary, primary_expr);
-      expect(TOKEN_TYPE::RPAR);
+      Expect(TOKEN_TYPE::RPAR);
       return ResultMonad(std::move(primary));
     }
 
     return primary_expr();
   };
 
-static auto unary_expr = 
+static ParserFunction<ExprASTNode> unary_expr = 
   []() -> ResultMonad<ExprASTNode> {
     if(CurTok.type == TOKEN_TYPE::MINUS || CurTok.type == TOKEN_TYPE::NOT) {
       ConsumeVal(TOKEN_TYPE, op, token_type);
@@ -302,7 +330,7 @@ static auto unary_expr =
     return parentheses_expr();
   };
 
-static auto mul_expr = 
+static ParserFunction<ExprASTNode> mul_expr = 
   []() -> ResultMonad<ExprASTNode> {
     Consume(ExprASTNode, lhs, unary_expr);
 
@@ -316,7 +344,7 @@ static auto mul_expr =
     return lhs;
   };
 
-static auto add_expr = 
+static ParserFunction<ExprASTNode> add_expr = 
   []() -> ResultMonad<ExprASTNode> {
     Consume(ExprASTNode, lhs, mul_expr);
 
@@ -331,7 +359,7 @@ static auto add_expr =
   };
 
 
-static auto rel_expr = 
+static ParserFunction<ExprASTNode> rel_expr = 
   []() -> ResultMonad<ExprASTNode> {
     Consume(ExprASTNode, lhs, add_expr);
 
@@ -345,7 +373,7 @@ static auto rel_expr =
     return lhs;
   };
 
-static auto eq_expr = 
+static ParserFunction<ExprASTNode> eq_expr = 
   []() -> ResultMonad<ExprASTNode> {
     Consume(ExprASTNode, lhs, rel_expr);
 
@@ -359,7 +387,7 @@ static auto eq_expr =
     return lhs;
   };
 
-static auto and_expr = 
+static ParserFunction<ExprASTNode> and_expr = 
   []() -> ResultMonad<ExprASTNode> {
     Consume(ExprASTNode, lhs, eq_expr);
 
@@ -409,29 +437,31 @@ static ParserFunction<std::vector<std::unique_ptr<StatementASTNode>>> stmt_list 
   };
 
 static ParserFunction<std::unique_ptr<VariableDeclASTNode>> local_decl =
-  []() -> ResultMonad<std::unique_ptr<VariableDeclASTNode>> {
+  []() -> ResultMonad<VariableDeclASTNode> {
     ConsumeVal(VariableType, type, var_type);
     ConsumeVal(std::string, value, ident);
-    expect(TOKEN_TYPE::SC);
+    Expect(TOKEN_TYPE::SC);
 
     return ResultMonad(VariableDeclASTNode(CurTok, value, type));
   };
 
 static ParserFunction<std::vector<std::unique_ptr<DeclASTNode>>> local_decl_list =
   []() -> ResultMonad<std::vector<std::unique_ptr<DeclASTNode>>> {
-    std::vector<std::unique_ptr<DeclASTNode>> decls;
+    std::vector<std::unique_ptr<VariableDeclASTNode>> decls;
 
+    std::cout << "4" << std::endl;
     while(isVarTypeFirst()) {
-      Consume(DeclASTNode, decl, local_decl);
+      Consume(VariableDeclASTNode, decl, local_decl);
       decls.push_back(std::move(decl));
     }
+    std::cout << "5" << std::endl;
 
     return ResultMonad(std::move(decls));
   };
 
 static ParserFunction<std::unique_ptr<BlockASTNode>> block = 
-  []() -> ResultMonad<std::unique_ptr<BlockASTNode>> {
-    expect(TOKEN_TYPE::LBRA);
+  []() -> ResultMonad<BlockASTNode> {
+    Expect(TOKEN_TYPE::LBRA);
 
     Consume(std::vector<std::unique_ptr<DeclASTNode>>, decls, local_decl_list);
     // std::vector<std::unique_ptr<DeclASTNode>> decls;
@@ -446,7 +476,7 @@ static ParserFunction<std::unique_ptr<BlockASTNode>> block =
     
     Consume(std::vector<std::unique_ptr<StatementASTNode>>, statements, stmt_list);
 
-    expect(TOKEN_TYPE::RBRA);
+    Expect(TOKEN_TYPE::RBRA);
 
     return ResultMonad(BlockASTNode(std::move(*decls.release()), std::move(*statements.release())));
   };
@@ -455,10 +485,10 @@ static ParserFunction<IfElseASTNode> if_stmt =
   []() -> ResultMonad<IfElseASTNode> {
     std::unique_ptr<BlockASTNode> else_branch;
 
-    expect(TOKEN_TYPE::IF);
-    expect(TOKEN_TYPE::LPAR);
+    Expect(TOKEN_TYPE::IF);
+    Expect(TOKEN_TYPE::LPAR);
     Consume(ExprASTNode, condition, expr);
-    expect(TOKEN_TYPE::RPAR);
+    Expect(TOKEN_TYPE::RPAR);
     Consume(BlockASTNode, then_branch, block);
     if(CurTok.type == TOKEN_TYPE::ELSE) {
       getNextToken();
@@ -470,10 +500,10 @@ static ParserFunction<IfElseASTNode> if_stmt =
 
 static ParserFunction<WhileASTNode> while_stmt =
   []() -> ResultMonad<WhileASTNode> {
-    expect(TOKEN_TYPE::WHILE);
-    expect(TOKEN_TYPE::LPAR);
+    Expect(TOKEN_TYPE::WHILE);
+    Expect(TOKEN_TYPE::LPAR);
     Consume(ExprASTNode, condition, expr);
-    expect(TOKEN_TYPE::RPAR);
+    Expect(TOKEN_TYPE::RPAR);
     Consume(BlockASTNode, body, block);
 
     return WhileASTNode(std::move(condition), std::move(body));
@@ -483,11 +513,11 @@ static ParserFunction<ReturnStmtASTNode> return_stmt =
   []() -> ResultMonad<ReturnStmtASTNode> {
     std::unique_ptr<ExprASTNode> exp;
 
-    expect(TOKEN_TYPE::RETURN);
+    Expect(TOKEN_TYPE::RETURN);
     if(CurTok.type != TOKEN_TYPE::SC) {
       ConsumeAssign(ExprASTNode, exp, expr);
     }
-    expect(TOKEN_TYPE::SC);
+    Expect(TOKEN_TYPE::SC);
 
     return ResultMonad(ReturnStmtASTNode(std::move(exp)));
   };
@@ -495,9 +525,9 @@ static ParserFunction<ReturnStmtASTNode> return_stmt =
 static ParserFunction<AssignmentStmtASTNode> assign_stmt =
   []() -> ResultMonad<AssignmentStmtASTNode> {
     ConsumeVal(std::string, name, ident);
-    expect(TOKEN_TYPE::ASSIGN);
+    Expect(TOKEN_TYPE::ASSIGN);
     Consume(ExprASTNode, exp, expr);
-    expect(TOKEN_TYPE::SC);
+    Expect(TOKEN_TYPE::SC);
 
     return ResultMonad(AssignmentStmtASTNode(CurTok, name, std::move(exp)));
   };
@@ -513,7 +543,7 @@ inline static ResultMonad<StatementASTNode> stmt() {
       return block();
     } else if(isExprFirst()) {
       Consume(ExprASTNode, stmt, expr);
-      expect(TOKEN_TYPE::SC);
+      Expect(TOKEN_TYPE::SC);
       return ResultMonad(std::move(stmt));
     }
 
@@ -551,13 +581,14 @@ static ParserFunction<std::vector<std::unique_ptr<FunctionParameterASTNode>>> fu
 
 static ParserFunction<ExternFunctionDeclASTNode> extern_decl = 
   []() -> ResultMonad<ExternFunctionDeclASTNode> {
-    getNextToken();
+
+    Expect(TOKEN_TYPE::EXTERN);
     ConsumeVal(TypeSpecType, type, type_spec);
     ConsumeVal(std::string, name, ident);
-    expect(TOKEN_TYPE::LPAR);
+    Expect(TOKEN_TYPE::LPAR);
     Consume(std::vector<std::unique_ptr<FunctionParameterASTNode>>, params, func_params);
-    expect(TOKEN_TYPE::RPAR);
-    expect(TOKEN_TYPE::SC); 
+    Expect(TOKEN_TYPE::RPAR);
+    Expect(TOKEN_TYPE::SC); 
 
     return ResultMonad(ExternFunctionDeclASTNode(name, std::move(*params.release()), type));
   };
@@ -584,16 +615,20 @@ static ParserFunction<DeclASTNode> decl =
       getNextToken();
       ConsumeAssignVal(std::string, name, ident);
     } else {
-      ConsumeAssignVal(TypeSpecType, type, (ResultMonad<TypeSpecType>) var_type);
+      //ConsumeAssignVal(VariableType, type, var_type);
+      { 
+        ResultMonad<VariableType> res = var_type(); \
+        if(res.success()) { type = (TypeSpecType)*std::move(res).unwrap_val(); } else { return res; }
+      }
       ConsumeAssignVal(std::string, name, ident);
       if(CurTok.type == TOKEN_TYPE::SC) {
         //return unique_ptr_cast<DeclASTNode, VariableDeclASTNode>(VariableDeclASTNode(CurTok, name, (VariableType) type));
         return ResultMonad(VariableDeclASTNode(CurTok, name, (VariableType) type));
       }
     }
-    expect(TOKEN_TYPE::LPAR);
+    Expect(TOKEN_TYPE::LPAR);
     Consume(std::vector<std::unique_ptr<FunctionParameterASTNode>>, params, func_params);
-    expect(TOKEN_TYPE::RPAR);
+    Expect(TOKEN_TYPE::RPAR);
 
     Consume(BlockASTNode, node, block);
 
@@ -607,11 +642,11 @@ ResultMonad<std::vector<std::unique_ptr<DeclASTNode>>> decl_list() {
   std::vector<std::unique_ptr<DeclASTNode>> func_decls;
   
   while(isTypeSpecFirst()) {
-    //Consume(DeclASTNode, node, decl);
-    std::unique_ptr<std::unique_ptr<DeclASTNode>> node;
-    { ResultMonad<std::unique_ptr<DeclASTNode>> res = decl();
-    if(res.success()) { node = res.unwrap(); } else { return res; }}
-    func_decls.push_back(std::move(*node.release()));
+    Consume(DeclASTNode, node, decl);
+    // std::unique_ptr<std::unique_ptr<DeclASTNode>> node;
+    // { ResultMonad<std::unique_ptr<DeclASTNode>> res = decl();
+    // if(res.success()) { node = res.unwrap(); } else { return res; }}
+    func_decls.push_back(std::move(node));
   }
 
   return ResultMonad(std::move(func_decls));
@@ -625,7 +660,9 @@ ResultMonad<ProgramASTNode> parser() {
   getNextToken();
 
   Consume(std::vector<std::unique_ptr<ExternFunctionDeclASTNode>>, extern_func_decls, extern_list);
+  std::cout << "2" << std::endl;
   Consume(std::vector<std::unique_ptr<DeclASTNode>>, decls, decl_list);
+  std::cout << "3" << std::endl;
 
   return ResultMonad(ProgramASTNode(std::move(*extern_func_decls.release()), std::move(*decls.release())));
 }

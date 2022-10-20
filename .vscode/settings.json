@@ -73,6 +73,21 @@
         "hash_set": "cpp",
         "bitset": "cpp",
         "shared_mutex": "cpp",
-        "*.inc": "cpp"
-    }
+        "*.inc": "cpp",
+        "cerrno": "cpp",
+        "csignal": "cpp",
+        "any": "cpp",
+        "strstream": "cpp",
+        "complex": "cpp",
+        "coroutine": "cpp",
+        "typeindex": "cpp"
+    },
+    "makefile.launchConfigurations": [
+        {
+            "cwd": "/mnt/nvme0n1p4/Personal/University/cs325/code",
+            "binaryPath": "/mnt/nvme0n1p4/Personal/University/cs325/code/mccomp",
+            "binaryArgs": []
+        }
+    ],
+    "sonarlint.pathToCompileCommands": "${workspaceFolder}/build/compile_commands.json"
 }
