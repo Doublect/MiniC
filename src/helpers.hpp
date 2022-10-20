@@ -6,76 +6,90 @@
         return std::unique_ptr<Base>(std::make_unique<Derived>(std::move(p)));
     }
 
-    class Error {
+    class ErrorT {
 
     };
 
-    template<typename T>
-    class ResultMonad {
-        bool successVal;
+
+    template<typename T, bool B> class ResultMonad {
         bool released = false;
         std::unique_ptr<T> val;
-        Error err;
-        
+        ErrorT err;
+
         public:
-            ResultMonad(T &&val) : val(std::make_unique<T>(std::move(val))), successVal(true) {}
-            ResultMonad(std::unique_ptr<T> &&val) : val(std::move(val)), successVal(true) {}
-            ResultMonad(Error err) : err(err), successVal(false) {}
+            ResultMonad(std::unique_ptr<T> &&val) : val(std::move(val)) {}
+            ResultMonad(T &&val) : val(std::make_unique<T>(std::move(val))) {}
+            ResultMonad(ErrorT err) : err(err) {}
+    };
+    template<typename T> class ResultMonad<T, true> {
+            
+        public:
+
+            template<typename U>
+            operator ResultMonad<U, true>() {
+                static_assert(std::is_convertible<T*, U*>::value, "Cannot convert types");
+                
+                ResultMonad<U, true> res(std::move(val));
+                return res;
+            }
+
             std::unique_ptr<T> unwrap() {
-                if(released) {
-                    //throw  "Already released";
-                }
-                if(!successVal) {
-                    //throw "Cannot consume a false result";
-                }
-                released = true;
                 return std::move(val);
             }
 
             T* unwrap_val() {
-                if(released) {
-                    //throw  "Already released";
-                }
-                if(!successVal) {
-                    //throw "Cannot consume a false result";
-                }
-                released = true;
-                return val.release();
+                return std::move(val.release());
             }
 
-            std::unique_ptr<T> unwrap_or(std::unique_ptr<T> &&def) {
-                if(released) {
-                    //throw  "Already released";
-                }
-                if(!successVal) {
-                    return std::move(def);
-                }
-
-                released = true;
-                return std::move(val);
+            std::unique_ptr<T> unwrap_or(std::unique_ptr<ErrorT> &&def) {
+                return nullptr;
             }
 
-            Error consume_error() {
-                if(successVal) {
-                   // throw "Cannot consume a true result";
-                }
+            bool success() {
+                return true;
+            }
+    };
 
+    template<>
+    class ResultMonad<ErrorT, false> {
+        
+        public:
+            std::unique_ptr<ErrorT> unwrap() {
+                return nullptr;
+            }
+
+            ErrorT* unwrap_val() {
+                return nullptr;
+            }
+
+            std::unique_ptr<ErrorT> unwrap_or(std::unique_ptr<ErrorT> &&def) {
+                return nullptr;
+            }
+
+            ErrorT consume_error() {
                 return std::move(err);
             }
 
             template<typename U>
-            operator ResultMonad<U>() { 
-                if(successVal) { 
-                    //throw new "Can't convert success result";
-                    return (ResultMonad<U>) *this;
-                } 
-                else { 
-                    return (ResultMonad<U>) *this; 
-                }
+            operator ResultMonad<U, false>() {
+                return (ResultMonad<U, false>) *this;
             }
 
             bool success() {
-                return successVal;
+                return false;
             }
     };
+
+    template<typename T> ResultMonad(T&&) -> ResultMonad<T, true>;
+    template<typename T> ResultMonad(std::unique_ptr<T>&&) -> ResultMonad<T, true>;
+    template<> ResultMonad(ErrorT) -> ResultMonad<ErrorT, false>;
+
+    auto make_result(ErrorT &&err) {
+        return ResultMonad<ErrorT, false>(std::move(err));
+    }
+
+    template<typename T>
+    auto make_result(T&& val) {
+        return ResultMonad<T, true>(std::move(val));
+    }
 #endif

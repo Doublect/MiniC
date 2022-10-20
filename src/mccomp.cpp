@@ -11,7 +11,7 @@
 #include <map>
 #include <memory>
 #include <queue>
-#include <string.h>
+#include <cstring>
 #include <string>
 #include <system_error>
 #include <utility>
@@ -49,8 +49,9 @@ extern int lineNo, columnNo;
 int main(int argc, char **argv) {
   if (argc == 2) {
     pFile = fopen(argv[1], "r");
-    if (pFile == NULL)
+    if (pFile == nullptr) {
       perror("Error opening file");
+    }
   } else {
     std::cout << "Usage: ./code InputFile\n";
     return 1;
@@ -71,9 +72,9 @@ int main(int argc, char **argv) {
 
   // Make the module, which holds all the code.
   TheModule = std::make_unique<Module>("mini-c", TheContext);
-
+  std::cout << "Parsing...\n";
   // Run the parser now.
-  parser().unwrap().get()->to_ast_print()->printAST();
+  parser().unwrap()->to_ast_print()->printAST();
   fprintf(stderr, "Parsing Finished\n");
 
   //********************* Start printing final IR **************************

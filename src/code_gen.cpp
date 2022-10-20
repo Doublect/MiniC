@@ -40,15 +40,15 @@ std::map<std::string, Value *> NamedValues;
 
 #pragma region Expressions
 
-Value *IntASTNode::codegen() {
+auto IntASTNode::codegen() {
     return ConstantInt::get(TheContext, APSInt(Val));
 }
 
-Value *FloatASTNode::codegen() {
+auto FloatASTNode::codegen() {
     return ConstantFP::get(TheContext, APFloat(Val));
 }
 
-Value *BoolASTNode::codegen() {
+auto BoolASTNode::codegen() {
     //return Constant
     return ConstantFP::get(TheContext, APFloat((float)Val));
 }
@@ -66,7 +66,7 @@ std::function<Value*(TOKEN_TYPE Op, llvm::Value *L, const llvm::Twine &Name)> un
         }        
     };
 
-Value *UnaryASTNode::codegen() {
+auto UnaryASTNode::codegen() {
     Value *L = Operand->codegen();
     return unary_op_builder(Op, L, "unary");
 }
@@ -120,11 +120,12 @@ std::function<Value *(VariableType type, TOKEN_TYPE Op, llvm::Value *L, llvm::Va
                 return Build(type, VariableType::INT, Builder.CreateICmpSLE, Builder.CreateFCmpOLE);
             case TOKEN_TYPE::LT:
                 return Build(type, VariableType::INT, Builder.CreateICmpSLT, Builder.CreateFCmpOLT);
-
+            default:
+                return nullptr;
         }
     };
 
-Value *BinaryASTNode::codegen() {
+auto BinaryASTNode::codegen() {
     Value *L = LHS->codegen();
     Value *R = RHS->codegen();
 
@@ -134,11 +135,11 @@ Value *BinaryASTNode::codegen() {
     return operation_function(type, Op, L, R, "binary_op");
 }
 
-Value *VariableRefASTNode::codegen() {
+auto VariableRefASTNode::codegen() {
     return NamedValues[Name];
 }
 
-Value *CallExprAST::codegen() {
+auto CallExprAST::codegen() {
     Function *Function = TheModule->getFunction(FunctionName);
 
     //TODO: error, non-existent

@@ -10,10 +10,13 @@
 
   TOKEN getNextToken();
 
-  template<typename T> using ParserFunction = std::function<ResultMonad<T>()>;
+  template<typename T, bool B> using ParserFunction = std::function<ResultMonad<T, B>()>;
 
-  ResultMonad<std::vector<std::unique_ptr<DeclASTNode>>> decl_list();
-  static ResultMonad<std::vector<std::unique_ptr<ExternFunctionDeclASTNode>>> extern_list();
+  //ResultMonad<std::vector<std::unique_ptr<DeclASTNode>>, B> decl_list();
+  //static ResultMonad<std::vector<std::unique_ptr<ExternFunctionDeclASTNode>>> extern_list();
+  auto decl_list();
+  auto extern_list();
 
-  ResultMonad<ProgramASTNode> parser();
+  //ResultMonad<ProgramASTNode> parser();
+  auto parser();
 #endif
