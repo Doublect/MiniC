@@ -75,20 +75,16 @@ int main(int argc, char **argv) {
   std::cout << "Parsing...\n";
   // Run the parser now.
   auto res = parser();
-  std::cout << res.success() << std::endl;
   if(!res.success()) {
-    std::cout << res.success() << std::endl;
+    std::cout << "Parser Error" << std::endl;
     std::cout << res.error().msg() << std::endl;
 
     return 1;
   } else {
     std::cout << res.success() << std::endl;
-    std::cout << "Success" << std::endl;
+    std::cout << "Successful Parsing" << std::endl;
+    std::move(res).unwrap()->to_ast_print()->printAST();
   }
-    // .unwrap()
-    // ->to_ast_print()
-    // ->printAST();
-  fprintf(stderr, "Parsing Finished\n");
 
   //********************* Start printing final IR **************************
   // Print out all of the generated code into a file called output.ll

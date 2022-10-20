@@ -1,8 +1,8 @@
 #ifndef HELPERS_H
 #define HELPERS_H
     #include <memory>
-#include <type_traits>
-#include <iostream>
+    #include <type_traits>
+    #include <iostream>
     
     template <typename Base, typename Derived> std::unique_ptr<Base> unique_ptr_cast(Derived &&p) {
         return std::unique_ptr<Base>(std::make_unique<Derived>(std::move(p)));
@@ -95,11 +95,11 @@
 
     template<typename T>
     ResultMonad<T> make_result(T&& val) {
-        return ResultMonad<T>(std::make_unique(std::move(val)));
+        return ResultMonad<T>(std::make_unique<T>(std::move(val)));
     }
 
     template<typename T>
-    ResultMonad<T> make_result(std::unique_ptr<T>&& val) {
+    ResultMonad<T> make_result_ptr(std::unique_ptr<T>&& val) {
         return ResultMonad<T>(std::move(val));
     }
 
