@@ -27,331 +27,6 @@ enum TypeSpecType {
     BOOL = -5,
 };
 
-//===----------------------------------------------------------------------===//
-// AST nodes
-//===----------------------------------------------------------------------===//
-#pragma region AST
-
-// /// ASTNode - Base class for all AST nodes.
-// class ASTNode
-// {
-// public:
-//   virtual ~ASTNode();
-//   virtual auto codegen();
-//   virtual std::string to_string();
-
-//   virtual std::unique_ptr<ASTPrint> to_ast_print();
-
-//   virtual void print(std::string indent, std::string str = "", bool last = false);
-
-//   virtual void print_string(std::string indent, std::string str, bool last = false);
-// };
-
-// template <typename T>
-// static std::vector<std::unique_ptr<ASTPrint>> map_printer(std::vector<std::unique_ptr<T>> &nodes);
-
-// class StatementASTNode : public ASTNode
-// {
-// public:
-//     StatementASTNode();
-//     virtual auto codegen();
-//     virtual void print(std::string indent);
-//     };
-
-// class ExprASTNode : public StatementASTNode
-// {
-// public:
-//     ExprASTNode();
-//     virtual auto codegen();
-//     virtual void print(std::string indent);
-// };
-
-// /// AST representation of an integer number
-// class IntASTNode : public ExprASTNode
-// {
-//     int Val;
-//     TOKEN Tok;
-//     std::string Name;
-
-// public:
-//     IntASTNode(TOKEN tok, int val);
-//     virtual auto codegen();
-//     virtual std::unique_ptr<ASTPrint> to_ast_print();
-// };
-
-//     /// AST representation of a boolean value
-// class BoolASTNode : public ExprASTNode
-// {
-//     bool Val;
-//     TOKEN Tok;
-//     std::string Name;
-
-// public:
-//     BoolASTNode(TOKEN tok, bool val);
-//     virtual auto codegen();
-//     virtual std::unique_ptr<ASTPrint> to_ast_print();
-// };
-
-// /// AST representation of a float literal
-// class FloatASTNode : public ExprASTNode
-// {
-//     float Val;
-//     TOKEN Tok;
-//     std::string Name;
-
-//     public:
-//     FloatASTNode(TOKEN tok, float val);
-//     virtual auto codegen();
-//     virtual std::unique_ptr<ASTPrint> to_ast_print();
-// };
-
-// ///----------------------------------------------------------------------------
-// /// Expressions
-// ///----------------------------------------------------------------------------
-
-// class UnaryASTNode : public ExprASTNode
-// {
-//     TOKEN_TYPE Op;
-//     std::unique_ptr<ExprASTNode> Operand;
-
-//     TOKEN Tok;
-
-// public:
-//     UnaryASTNode(TOKEN tok, TOKEN_TYPE op, std::unique_ptr<ExprASTNode> operand);
-//     virtual auto codegen();
-
-//     virtual std::unique_ptr<ASTPrint> to_ast_print();
-// };
-
-// /// AST representation of a binary expression
-// class BinaryASTNode : public ExprASTNode
-// {
-//     TOKEN_TYPE Op;
-//     std::unique_ptr<ExprASTNode> LHS, RHS;
-
-//     TOKEN Tok;
-//     std::string Name;
-
-// public:
-//     BinaryASTNode(TOKEN tok, TOKEN_TYPE op, std::unique_ptr<ExprASTNode> LHS,
-//                     std::unique_ptr<ExprASTNode> RHS);
-//     virtual auto codegen();
-
-//     virtual std::unique_ptr<ASTPrint> to_ast_print();
-// };
-
-// /// AST representation of a variable reference
-// class VariableRefASTNode : public ExprASTNode
-// {
-//     std::string Name;
-//     TOKEN Tok;
-
-// public:
-//     VariableRefASTNode(TOKEN tok, const std::string &Name);
-//     virtual auto codegen();
-//     virtual std::unique_ptr<ASTPrint> to_ast_print();
-// };
-
-// // AST representation of a function call
-// class CallExprAST : public ExprASTNode
-// {
-//     std::string FunctionName;
-//     std::vector<std::unique_ptr<ExprASTNode>> Args;
-
-//     TOKEN tok;
-
-// public:
-//     CallExprAST(TOKEN tok, const std::string &funcName,
-//                 std::vector<std::unique_ptr<ExprASTNode>> Args);
-//     virtual auto codegen();
-
-//     virtual std::unique_ptr<ASTPrint> to_ast_print();
-// };
-
-// class AssignmentASTNode : public ExprASTNode
-// {
-//     std::string Name;
-//     std::unique_ptr<ExprASTNode> RHS;
-//     TOKEN Tok;
-
-// public:
-//     AssignmentASTNode(TOKEN tok, const std::string &Name,
-//                         std::unique_ptr<ExprASTNode> RHS);
-//     virtual auto codegen();
-//     virtual std::unique_ptr<ASTPrint> to_ast_print();
-// };
-
-// ///----------------------------------------------------------------------------
-// /// Statements
-// ///----------------------------------------------------------------------------
-// #pragma region Statements
-// class ExprStatementASTNode : public StatementASTNode
-// {
-//     std::unique_ptr<ExprASTNode> Expr;
-
-// public:
-//     ExprStatementASTNode(std::unique_ptr<ExprASTNode> expr);
-//     virtual auto codegen();
-
-//     virtual std::unique_ptr<ASTPrint> to_ast_print();
-// };
-
-// class VariableDeclASTNode;
-
-// class BlockASTNode : public StatementASTNode
-// {
-//     std::vector<std::unique_ptr<VariableDeclASTNode>> Declarations;
-//     std::vector<std::unique_ptr<StatementASTNode>> Statements;
-
-// public:
-//     BlockASTNode(std::vector<std::unique_ptr<StatementASTNode>> statements);
-//     virtual auto codegen();
-//     virtual std::unique_ptr<ASTPrint> to_ast_print();
-// };
-
-// class IfElseASTNode : public StatementASTNode
-// {
-//     std::unique_ptr<ExprASTNode> Cond;
-//     std::unique_ptr<BlockASTNode> Then;
-//     std::unique_ptr<BlockASTNode> Else;
-
-// public:
-//     IfElseASTNode(std::unique_ptr<ExprASTNode> Cond, std::unique_ptr<BlockASTNode> Then,
-//                     std::unique_ptr<BlockASTNode> Else);
-//     virtual auto codegen();
-//     virtual std::unique_ptr<ASTPrint> to_ast_print();
-// };
-
-// class WhileASTNode : public StatementASTNode
-// {
-//     std::unique_ptr<ExprASTNode> Cond;
-//     std::unique_ptr<BlockASTNode> Body;
-
-// public:
-//     WhileASTNode(std::unique_ptr<ExprASTNode> Cond, std::unique_ptr<BlockASTNode> Body);
-//     virtual auto codegen();
-
-//     virtual std::unique_ptr<ASTPrint> to_ast_print();
-// };
-
-// class ReturnStmtASTNode : public StatementASTNode
-// {
-//     std::unique_ptr<ExprASTNode> Expr;
-
-// public:
-//     ReturnStmtASTNode(std::unique_ptr<ExprASTNode> expr);
-//     virtual auto codegen();
-
-//     virtual std::unique_ptr<ASTPrint> to_ast_print();
-// };
-
-// class AssignmentStmtASTNode : public StatementASTNode
-// {
-//     std::string Name;
-//     std::unique_ptr<ExprASTNode> RHS;
-//     TOKEN Tok;
-
-// public:
-//     AssignmentStmtASTNode(TOKEN tok, const std::string &Name,
-//                             std::unique_ptr<ExprASTNode> RHS);
-//     virtual auto codegen();
-//     virtual std::unique_ptr<ASTPrint> to_ast_print();
-// };
-
-// class EmptyStatementASTNode : public StatementASTNode
-// {
-
-// public:
-//     EmptyStatementASTNode();
-//     virtual auto codegen();
-//     virtual std::unique_ptr<ASTPrint> to_ast_print();
-// };
-// #pragma endregion
-// ///----------------------------------------------------------------------------
-// /// Declarations
-// ///----------------------------------------------------------------------------
-// #pragma region Declarations
-// class DeclASTNode : public ASTNode
-// {
-
-// public:
-//     DeclASTNode();
-//     virtual auto codegen();
-//     virtual std::unique_ptr<ASTPrint> to_ast_print();
-// };
-
-// class VariableDeclASTNode : public DeclASTNode
-// {
-//     std::string Name;
-//     TOKEN Tok;
-//     VariableType Type;
-
-// public:
-//     VariableDeclASTNode(TOKEN tok, const std::string &Name, VariableType type);
-//     virtual auto codegen();
-
-//     virtual std::unique_ptr<ASTPrint> to_ast_print();
-// };
-
-// class FunctionParameterASTNode : public VariableDeclASTNode
-// {
-//     // Inherit constructor
-//     using VariableDeclASTNode::VariableDeclASTNode;
-
-// public:
-//     virtual auto codegen();
-// };
-
-// class FunctionDeclASTNode : public DeclASTNode
-// {
-//     std::string Name;
-//     std::vector<std::unique_ptr<FunctionParameterASTNode>> Args;
-//     std::unique_ptr<BlockASTNode> Body;
-//     TypeSpecType ReturnType;
-
-// public:
-//     FunctionDeclASTNode(std::string Name,
-//                         std::vector<std::unique_ptr<FunctionParameterASTNode>> Args,
-//                         std::unique_ptr<BlockASTNode> Body, TypeSpecType returnType);
-//     virtual auto codegen();
-
-//     virtual std::unique_ptr<ASTPrint> to_ast_print();
-// };
-
-// class ExternFunctionDeclASTNode : public ASTNode
-// {
-//     std::string Name;
-//     std::vector<std::unique_ptr<FunctionParameterASTNode>> Args;
-//     TypeSpecType ReturnType;
-
-// public:
-//     ExternFunctionDeclASTNode(std::string Name,
-//                                 std::vector<std::unique_ptr<FunctionParameterASTNode>> Args,
-//                                 TypeSpecType returnType);
-//     virtual auto codegen();
-
-//     virtual std::unique_ptr<ASTPrint> to_ast_print();
-// };
-
-// class ProgramASTNode : public ASTNode
-// {
-//     std::vector<std::unique_ptr<ExternFunctionDeclASTNode>> ExternDeclarations;
-//     std::vector<std::unique_ptr<DeclASTNode>> Declarations;
-
-// public:
-//     ProgramASTNode(std::vector<std::unique_ptr<ExternFunctionDeclASTNode>> ExternDeclarations,
-//                     std::vector<std::unique_ptr<DeclASTNode>> Declarations)
-//         : ExternDeclarations(std::move(ExternDeclarations)), Declarations(std::move(Declarations)) {}
-//     virtual auto codegen();
-
-//     virtual std::unique_ptr<ASTPrint> to_ast_print();
-// };
-// #pragma endregion
-#pragma endregion
-
-#pragma endregion
-#pragma endregion
-
 class ASTNode;
 class StatementASTNode;
 class IntASTNode;
@@ -405,7 +80,7 @@ class ASTNode
 {
 public:
   virtual ~ASTNode() {}
-  auto codegen() {return nullptr; };
+  virtual Value *codegen() = 0;
   virtual std::string to_string() const { return "ASTNode"; };
 
   virtual std::unique_ptr<ASTPrint> to_ast_print()
@@ -438,16 +113,18 @@ class StatementASTNode : public ASTNode
 {
 public:
   StatementASTNode() {}
-  auto codegen() { return nullptr; };
+  virtual Value *codegen() { return nullptr; };
   virtual void print(std::string indent) { ASTNode::print(indent, ""); };
 };
 
 class ExprASTNode : public StatementASTNode
 {
+  TypeSpecType Type;
 public:
   ExprASTNode() {}
-  auto codegen() { return nullptr; };
+  virtual Value *codegen() { return nullptr; };
   virtual void print(std::string indent) { ASTNode::print(indent, ""); };
+  virtual TypeSpecType getType() { return Type; };
 };
 
 /// AST representation of an integer number
@@ -459,7 +136,7 @@ class IntASTNode : public ExprASTNode
 
 public:
   IntASTNode(TOKEN tok, int val) : Val(val), Tok(tok) {}
-  auto codegen();
+  virtual Value *codegen();
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
     return make_ast_print(
@@ -481,7 +158,7 @@ class FloatASTNode : public ExprASTNode
 
 public:
   FloatASTNode(TOKEN tok, float val) : Val(val), Tok(tok) {}
-  auto codegen();
+  virtual Value *codegen();
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
     return make_ast_print(
@@ -500,7 +177,7 @@ class BoolASTNode : public ExprASTNode
 
 public:
   BoolASTNode(TOKEN tok, bool val) : Val(val), Tok(tok) {}
-  auto codegen();
+  virtual Value *codegen();
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
     return make_ast_print(
@@ -524,7 +201,7 @@ class UnaryASTNode : public ExprASTNode
 public:
   UnaryASTNode(TOKEN tok, TOKEN_TYPE op, std::unique_ptr<ExprASTNode> operand)
       : Op(op), Operand(std::move(operand)), Tok(tok) {}
-  auto codegen();
+  virtual Value *codegen();
 
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
@@ -552,7 +229,7 @@ public:
   BinaryASTNode(TOKEN tok, TOKEN_TYPE op, std::unique_ptr<ExprASTNode> LHS,
                 std::unique_ptr<ExprASTNode> RHS)
       : Op(op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
-  auto codegen();
+  virtual Value *codegen();
 
   std::unique_ptr<ASTPrint> to_ast_print()
   {
@@ -576,7 +253,7 @@ class VariableRefASTNode : public ExprASTNode
 
 public:
   VariableRefASTNode(TOKEN tok, const std::string &Name) : Name(Name) {}
-  auto codegen();
+  virtual Value *codegen();
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
     return make_ast_print(
@@ -599,7 +276,7 @@ public:
   CallExprAST(TOKEN tok, const std::string &funcName,
               std::vector<std::unique_ptr<ExprASTNode>> Args)
       : tok(tok), FunctionName(funcName), Args(std::move(Args)) {}
-  auto codegen();
+  virtual Value *codegen();
 
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
@@ -625,7 +302,7 @@ public:
   AssignmentASTNode(TOKEN tok, const std::string &Name,
                     std::unique_ptr<ExprASTNode> RHS)
       : Name(Name), RHS(std::move(RHS)) {}
-  auto codegen() { return nullptr; };
+  virtual Value *codegen();
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
     auto children = std::vector<std::unique_ptr<ASTPrint>>();
@@ -644,27 +321,27 @@ public:
 /// Statements
 ///----------------------------------------------------------------------------
 #pragma region Statements
-class ExprStatementASTNode : public StatementASTNode
-{
-  std::unique_ptr<ExprASTNode> Expr;
+// class ExprStatementASTNode : public StatementASTNode
+// {
+//   std::unique_ptr<ExprASTNode> Expr;
 
-public:
-  ExprStatementASTNode(std::unique_ptr<ExprASTNode> expr) : Expr(std::move(expr)) {}
-  auto codegen() { return nullptr; };
+// public:
+//   ExprStatementASTNode(std::unique_ptr<ExprASTNode> expr) : Expr(std::move(expr)) {}
+//   virtual Value *codegen() { return nullptr; };
 
-  virtual std::unique_ptr<ASTPrint> to_ast_print()
-  {
-    auto children = std::vector<std::unique_ptr<ASTPrint>>();
+//   virtual std::unique_ptr<ASTPrint> to_ast_print()
+//   {
+//     auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
-    children.push_back(Expr->to_ast_print());
+//     children.push_back(Expr->to_ast_print());
 
-    return make_ast_print(
-        "ExprStatementASTNode",
-        "",
-        std::move(children)
-    );
-  }
-};
+//     return make_ast_print(
+//         "ExprStatementASTNode",
+//         "",
+//         std::move(children)
+//     );
+//   }
+// };
 
 class VariableDeclASTNode;
 
@@ -677,7 +354,7 @@ public:
   BlockASTNode(std::vector<std::unique_ptr<DeclASTNode>> &&declarations,
     std::vector<std::unique_ptr<StatementASTNode>> &&statements) 
     : Declarations(std::move(declarations)), Statements(std::move(statements)) {}
-  auto codegen() { return nullptr; };
+  virtual Value *codegen();
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
     auto children = std::vector<std::unique_ptr<ASTPrint>>();
@@ -703,7 +380,7 @@ public:
   IfElseASTNode(std::unique_ptr<ExprASTNode> Cond, std::unique_ptr<BlockASTNode> Then,
                 std::unique_ptr<BlockASTNode> Else)
       : Cond(std::move(Cond)), Then(std::move(Then)), Else(std::move(Else)) {}
-  auto codegen() { return nullptr; };
+  virtual Value *codegen();
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
     auto children = std::vector<std::unique_ptr<ASTPrint>>();
@@ -734,7 +411,7 @@ class WhileASTNode : public StatementASTNode
 public:
   WhileASTNode(std::unique_ptr<ExprASTNode> Cond, std::unique_ptr<BlockASTNode> Body)
       : Cond(std::move(Cond)), Body(std::move(Body)) {}
-  auto codegen() { return nullptr; };
+  virtual Value *codegen();
 
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
@@ -757,7 +434,7 @@ class ReturnStmtASTNode : public StatementASTNode
 
 public:
   ReturnStmtASTNode(std::unique_ptr<ExprASTNode> expr) : Expr(std::move(expr)) {}
-  auto codegen() { return nullptr; };
+  virtual Value *codegen();
 
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
@@ -783,7 +460,7 @@ public:
   AssignmentStmtASTNode(TOKEN tok, const std::string &Name,
                         std::unique_ptr<ExprASTNode> RHS)
       : Name(Name), RHS(std::move(RHS)) {}
-  auto codegen() { return nullptr; };
+  virtual Value *codegen();
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
     auto children = std::vector<std::unique_ptr<ASTPrint>>();
@@ -802,7 +479,7 @@ class EmptyStatementASTNode : public StatementASTNode
 
 public:
   EmptyStatementASTNode() {}
-  auto codegen() { return nullptr; };
+  virtual Value *codegen() { return nullptr; };
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
     return make_ast_print(
@@ -822,7 +499,7 @@ class DeclASTNode : public ASTNode
 
 public:
   DeclASTNode() {}
-  auto codegen() { return nullptr; };
+  virtual Value *codegen() = 0;
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
     return make_ast_print(
@@ -835,13 +512,14 @@ public:
 
 class VariableDeclASTNode : public DeclASTNode
 {
+protected:
   std::string Name;
   TOKEN Tok;
   VariableType Type;
 
 public:
   VariableDeclASTNode(TOKEN tok, const std::string &Name, VariableType type) : Name(std::move(Name)), Type(type) {}
-  auto codegen() { return nullptr; };
+  virtual Value *codegen();
 
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
@@ -852,6 +530,8 @@ public:
             // ASTPrintLeaf("Type: " + std::to_string(Type)),
         ));
   }
+  virtual VariableType getType() { return Type; }
+  virtual std::string getName() { return Name; }
 };
 
 class FunctionParameterASTNode : public VariableDeclASTNode
@@ -860,7 +540,7 @@ class FunctionParameterASTNode : public VariableDeclASTNode
   using VariableDeclASTNode::VariableDeclASTNode;
 
 public:
-  auto codegen() { return nullptr; };
+  using VariableDeclASTNode::codegen;
 };
 
 class FunctionDeclASTNode : public DeclASTNode
@@ -875,7 +555,7 @@ public:
                       std::vector<std::unique_ptr<FunctionParameterASTNode>> Args,
                       std::unique_ptr<BlockASTNode> Body, TypeSpecType returnType)
       : Name(Name), Args(std::move(Args)), Body(std::move(Body)), ReturnType(returnType) {}
-  auto codegen() { return nullptr; };
+  virtual Value *codegen();
 
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
@@ -904,7 +584,7 @@ public:
                             std::vector<std::unique_ptr<FunctionParameterASTNode>> Args,
                             TypeSpecType returnType)
       : Name(Name), Args(std::move(Args)), ReturnType(returnType) {}
-  auto codegen() { return nullptr; };
+  virtual Value *codegen();
 
   virtual std::unique_ptr<ASTPrint> to_ast_print()
   {
@@ -930,7 +610,7 @@ public:
   ProgramASTNode(std::vector<std::unique_ptr<ExternFunctionDeclASTNode>> ExternDeclarations,
                  std::vector<std::unique_ptr<DeclASTNode>> Declarations)
       : ExternDeclarations(std::move(ExternDeclarations)), Declarations(std::move(Declarations)) {}
-  auto codegen() { return nullptr; };
+  virtual Value *codegen() override;
 
   std::unique_ptr<ASTPrint> to_ast_print() override
   {
