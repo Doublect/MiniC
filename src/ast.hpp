@@ -88,7 +88,7 @@ public:
     return make_ast_print("", "", std::vector<std::unique_ptr<ASTPrint>>());
   }
 
-  virtual void print(std::string indent, std::string str = "", bool last = false)
+  void print(std::string indent, std::string str = "", bool last = false)
   {
 
     std::string name = std::string(typeid(*this).name());
@@ -103,7 +103,7 @@ public:
     std::cout << std::endl;
   }
 
-  virtual void print_string(std::string indent, std::string str, bool last = false)
+  void print_string(std::string indent, std::string str, bool last = false)
   {
     std::cout << indent << (last ? "└─" : "├─") << str << std::endl;
   }
@@ -113,17 +113,14 @@ class StatementASTNode : public ASTNode
 {
 public:
   StatementASTNode() {}
-  virtual Value *codegen() { return nullptr; };
-  virtual void print(std::string indent) { ASTNode::print(indent, ""); };
+  virtual Value *codegen() override { return nullptr; };
 };
 
 class ExprASTNode : public StatementASTNode
 {
   TypeSpecType Type;
 public:
-  ExprASTNode() {}
-  virtual Value *codegen() { return nullptr; };
-  virtual void print(std::string indent) { ASTNode::print(indent, ""); };
+  virtual Value *codegen() override { return nullptr; };
   virtual TypeSpecType getType() { return Type; };
 };
 
@@ -136,8 +133,8 @@ class IntASTNode : public ExprASTNode
 
 public:
   IntASTNode(TOKEN tok, int val) : Val(val), Tok(tok) {}
-  virtual Value *codegen();
-  virtual std::unique_ptr<ASTPrint> to_ast_print()
+  virtual Value *codegen() override;
+  virtual std::unique_ptr<ASTPrint> to_ast_print() override
   {
     return make_ast_print(
         "IntASTNode",
@@ -158,8 +155,8 @@ class FloatASTNode : public ExprASTNode
 
 public:
   FloatASTNode(TOKEN tok, float val) : Val(val), Tok(tok) {}
-  virtual Value *codegen();
-  virtual std::unique_ptr<ASTPrint> to_ast_print()
+  virtual Value *codegen() override;
+  virtual std::unique_ptr<ASTPrint> to_ast_print() override
   {
     return make_ast_print(
         "FloatASTNode",
@@ -177,8 +174,8 @@ class BoolASTNode : public ExprASTNode
 
 public:
   BoolASTNode(TOKEN tok, bool val) : Val(val), Tok(tok) {}
-  virtual Value *codegen();
-  virtual std::unique_ptr<ASTPrint> to_ast_print()
+  virtual Value *codegen() override;
+  virtual std::unique_ptr<ASTPrint> to_ast_print() override
   {
     return make_ast_print(
         "BoolASTNode",
@@ -201,9 +198,9 @@ class UnaryASTNode : public ExprASTNode
 public:
   UnaryASTNode(TOKEN tok, TOKEN_TYPE op, std::unique_ptr<ExprASTNode> operand)
       : Op(op), Operand(std::move(operand)), Tok(tok) {}
-  virtual Value *codegen();
+  virtual Value *codegen() override;
 
-  virtual std::unique_ptr<ASTPrint> to_ast_print()
+  virtual std::unique_ptr<ASTPrint> to_ast_print() override
   {
     auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
@@ -229,9 +226,9 @@ public:
   BinaryASTNode(TOKEN tok, TOKEN_TYPE op, std::unique_ptr<ExprASTNode> LHS,
                 std::unique_ptr<ExprASTNode> RHS)
       : Op(op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
-  virtual Value *codegen();
+  virtual Value *codegen() override;
 
-  std::unique_ptr<ASTPrint> to_ast_print()
+  virtual std::unique_ptr<ASTPrint> to_ast_print() override
   {
     auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
@@ -253,8 +250,8 @@ class VariableRefASTNode : public ExprASTNode
 
 public:
   VariableRefASTNode(TOKEN tok, const std::string &Name) : Name(Name) {}
-  virtual Value *codegen();
-  virtual std::unique_ptr<ASTPrint> to_ast_print()
+  virtual Value *codegen() override;
+  virtual std::unique_ptr<ASTPrint> to_ast_print() override
   {
     return make_ast_print(
         "VariableRefASTNode",
@@ -276,9 +273,9 @@ public:
   CallExprAST(TOKEN tok, const std::string &funcName,
               std::vector<std::unique_ptr<ExprASTNode>> Args)
       : tok(tok), FunctionName(funcName), Args(std::move(Args)) {}
-  virtual Value *codegen();
+  virtual Value *codegen() override;
 
-  virtual std::unique_ptr<ASTPrint> to_ast_print()
+  virtual std::unique_ptr<ASTPrint> to_ast_print() override
   {
     auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
@@ -302,8 +299,8 @@ public:
   AssignmentASTNode(TOKEN tok, const std::string &Name,
                     std::unique_ptr<ExprASTNode> RHS)
       : Name(Name), RHS(std::move(RHS)) {}
-  virtual Value *codegen();
-  virtual std::unique_ptr<ASTPrint> to_ast_print()
+  virtual Value *codegen() override;
+  virtual std::unique_ptr<ASTPrint> to_ast_print() override
   {
     auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
@@ -329,7 +326,7 @@ public:
 //   ExprStatementASTNode(std::unique_ptr<ExprASTNode> expr) : Expr(std::move(expr)) {}
 //   virtual Value *codegen() { return nullptr; };
 
-//   virtual std::unique_ptr<ASTPrint> to_ast_print()
+//   virtual std::unique_ptr<ASTPrint> to_ast_print() override
 //   {
 //     auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
@@ -354,8 +351,8 @@ public:
   BlockASTNode(std::vector<std::unique_ptr<DeclASTNode>> &&declarations,
     std::vector<std::unique_ptr<StatementASTNode>> &&statements) 
     : Declarations(std::move(declarations)), Statements(std::move(statements)) {}
-  virtual Value *codegen();
-  virtual std::unique_ptr<ASTPrint> to_ast_print()
+  virtual Value *codegen() override;
+  virtual std::unique_ptr<ASTPrint> to_ast_print() override
   {
     auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
@@ -380,8 +377,8 @@ public:
   IfElseASTNode(std::unique_ptr<ExprASTNode> Cond, std::unique_ptr<BlockASTNode> Then,
                 std::unique_ptr<BlockASTNode> Else)
       : Cond(std::move(Cond)), Then(std::move(Then)), Else(std::move(Else)) {}
-  virtual Value *codegen();
-  virtual std::unique_ptr<ASTPrint> to_ast_print()
+  virtual Value *codegen() override;
+  virtual std::unique_ptr<ASTPrint> to_ast_print() override
   {
     auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
@@ -411,9 +408,9 @@ class WhileASTNode : public StatementASTNode
 public:
   WhileASTNode(std::unique_ptr<ExprASTNode> Cond, std::unique_ptr<BlockASTNode> Body)
       : Cond(std::move(Cond)), Body(std::move(Body)) {}
-  virtual Value *codegen();
+  virtual Value *codegen() override;
 
-  virtual std::unique_ptr<ASTPrint> to_ast_print()
+  virtual std::unique_ptr<ASTPrint> to_ast_print() override
   {
     auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
@@ -434,9 +431,9 @@ class ReturnStmtASTNode : public StatementASTNode
 
 public:
   ReturnStmtASTNode(std::unique_ptr<ExprASTNode> expr) : Expr(std::move(expr)) {}
-  virtual Value *codegen();
+  virtual Value *codegen() override;
 
-  virtual std::unique_ptr<ASTPrint> to_ast_print()
+  virtual std::unique_ptr<ASTPrint> to_ast_print() override
   {
     auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
@@ -460,8 +457,8 @@ public:
   AssignmentStmtASTNode(TOKEN tok, const std::string &Name,
                         std::unique_ptr<ExprASTNode> RHS)
       : Name(Name), RHS(std::move(RHS)) {}
-  virtual Value *codegen();
-  virtual std::unique_ptr<ASTPrint> to_ast_print()
+  virtual Value *codegen() override;
+  virtual std::unique_ptr<ASTPrint> to_ast_print() override
   {
     auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
@@ -479,8 +476,8 @@ class EmptyStatementASTNode : public StatementASTNode
 
 public:
   EmptyStatementASTNode() {}
-  virtual Value *codegen() { return nullptr; };
-  virtual std::unique_ptr<ASTPrint> to_ast_print()
+  Value *codegen() override { return nullptr; };
+  std::unique_ptr<ASTPrint> to_ast_print() override
   {
     return make_ast_print(
         "EmptyStatementASTNode",
@@ -499,8 +496,8 @@ class DeclASTNode : public ASTNode
 
 public:
   DeclASTNode() {}
-  virtual Value *codegen() = 0;
-  virtual std::unique_ptr<ASTPrint> to_ast_print()
+  virtual Value *codegen() override { return nullptr; };
+  virtual std::unique_ptr<ASTPrint> to_ast_print() override
   {
     return make_ast_print(
         "",
@@ -519,9 +516,9 @@ protected:
 
 public:
   VariableDeclASTNode(TOKEN tok, const std::string &Name, VariableType type) : Name(std::move(Name)), Type(type) {}
-  virtual Value *codegen();
+  virtual Value *codegen() override;
 
-  virtual std::unique_ptr<ASTPrint> to_ast_print()
+  virtual std::unique_ptr<ASTPrint> to_ast_print() override
   {
     return make_ast_print(
         "VariableDeclASTNode",
@@ -555,9 +552,9 @@ public:
                       std::vector<std::unique_ptr<FunctionParameterASTNode>> Args,
                       std::unique_ptr<BlockASTNode> Body, TypeSpecType returnType)
       : Name(Name), Args(std::move(Args)), Body(std::move(Body)), ReturnType(returnType) {}
-  virtual Value *codegen();
+  virtual Value *codegen() override;
 
-  virtual std::unique_ptr<ASTPrint> to_ast_print()
+  virtual std::unique_ptr<ASTPrint> to_ast_print() override
   {
     auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
@@ -573,7 +570,7 @@ public:
   }
 };
 
-class ExternFunctionDeclASTNode : public ASTNode
+class ExternFunctionDeclASTNode : public DeclASTNode
 {
   std::string Name;
   std::vector<std::unique_ptr<FunctionParameterASTNode>> Args;
@@ -584,9 +581,9 @@ public:
                             std::vector<std::unique_ptr<FunctionParameterASTNode>> Args,
                             TypeSpecType returnType)
       : Name(Name), Args(std::move(Args)), ReturnType(returnType) {}
-  virtual Value *codegen();
+  virtual Value *codegen() override;
 
-  virtual std::unique_ptr<ASTPrint> to_ast_print()
+  virtual std::unique_ptr<ASTPrint> to_ast_print() override
   {
     auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
