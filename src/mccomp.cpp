@@ -1,7 +1,6 @@
 
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/FileSystem.h"
-//#include "llvm/Support/TargetRegistry.h"
 #include <algorithm>
 #include <cassert>
 #include <cctype>
@@ -26,8 +25,8 @@ using namespace llvm;
 
 extern FILE *pFile;
 
-extern LLVMContext TheContext;
-extern IRBuilder<> Builder;
+extern std::unique_ptr<LLVMContext> TheContext;
+extern std::unique_ptr<IRBuilder<>> Builder;
 extern std::unique_ptr<Module> TheModule;
 
 extern int lineNo, columnNo;
@@ -71,7 +70,7 @@ int main(int argc, char **argv) {
   // fprintf(stderr, "Lexer Finished\n");
 
   // Make the module, which holds all the code.
-  TheModule = std::make_unique<Module>("mini-c", TheContext);
+
   std::cout << "Parsing...\n";
   // Run the parser now.
   auto res = parser();
@@ -83,7 +82,11 @@ int main(int argc, char **argv) {
   } else {
     std::cout << res.success() << std::endl;
     std::cout << "Successful Parsing" << std::endl;
-    std::move(res).unwrap()->to_ast_print()->printAST();
+    auto AST = std::move(res).unwrap();
+    
+    AST->to_ast_print()->printAST();
+
+    AST->codegen();
   }
 
   //********************* Start printing final IR **************************

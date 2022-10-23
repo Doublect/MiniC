@@ -88,21 +88,6 @@ public:
     return make_ast_print("", "", std::vector<std::unique_ptr<ASTPrint>>());
   }
 
-  void print(std::string indent, std::string str = "", bool last = false)
-  {
-
-    std::string name = std::string(typeid(*this).name());
-    name.erase(std::remove_if(name.begin(), name.end(), [](char c)
-                              { return std::isdigit(c); }),
-               name.end());
-
-    std::cout << indent << (last ? "└─" : "├─") << name;
-    if (str != "")
-      std::cout << " " << str;
-
-    std::cout << std::endl;
-  }
-
   void print_string(std::string indent, std::string str, bool last = false)
   {
     std::cout << indent << (last ? "└─" : "├─") << str << std::endl;
