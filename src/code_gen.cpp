@@ -84,16 +84,19 @@ static Type *GetType(TypeSpecType tst) {
 #pragma region Expressions
 
 Value *IntASTNode::codegen() {
-    return ConstantInt::get(*TheContext, APSInt(Val));
+    //std::cout << "Found int: " << Val << std::endl;
+    return ConstantInt::get(*TheContext, APInt(32, Val, true));
 }
 
 Value *FloatASTNode::codegen() {
+    //std::cout << "Found float: " << Val << std::endl;
     return ConstantFP::get(*TheContext, APFloat(Val));
 }
 
 Value *BoolASTNode::codegen() {
     //return Constant
-    return ConstantInt::get(*TheContext, APSInt((int)Val));
+    //std::cout << "Found bool: " << Val << std::endl;
+    return ConstantInt::get(*TheContext, APInt(32, (int)Val, true));
 }
 
 std::function<Value*(TOKEN_TYPE Op, llvm::Value *L, const llvm::Twine &Name)> unary_op_builder =
@@ -119,7 +122,9 @@ std::function<Value *(VariableType type, TOKEN_TYPE Op, llvm::Value *L, llvm::Va
         //std::function<Value *(llvm::Value *L, llvm::Value *R, const llvm::Twine &Name)> *func;
         std::vector<Value *> vals{L, R};
         
-
+        // std::cout << "Op: " << Op << std::endl;
+        // std::cout << "L: " << L->getType()->getTypeID() << std::endl;
+        // std::cout << "R: " << R->getType()->getTypeID() << std::endl;
         switch(Op) {
             case TOKEN_TYPE::PLUS:
                 return BuildInt(type, Builder->CreateAdd, Builder->CreateFAdd);
@@ -178,7 +183,7 @@ Value *VariableRefASTNode::codegen() {
         // TODO errors
         //return LogErrorV("Undeclared variable name: " + Name);
     }
-
+    // std::cout << "Found variable: " << Name << " Loading type: " << V->getAllocatedType()->getTypeID() << std::endl;
     return Builder->CreateLoad(V->getAllocatedType(), V, Name.c_str());
 }
 
@@ -375,7 +380,7 @@ Value *FunctionDeclASTNode::codegen() {
     Builder->SetInsertPoint(BB);
 
 
-    NamedValues.clear();
+    //NamedValues.clear();
     for(auto &arg: F->args()) {
         AllocaInst *Alloca = CreateBlockAlloca(BB, arg.getName().str());
 
@@ -387,6 +392,8 @@ Value *FunctionDeclASTNode::codegen() {
     // Do the body's code generation
     Body->codegen();
 
+
+    //TODO: REMOVE FUNC PARAMS from named values
     FunctionStack.pop();
     // Ensure the function is valid
     if(verifyFunction(*F)) {

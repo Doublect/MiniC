@@ -104,7 +104,7 @@
 
 
     template<typename T> 
-        requires std::is_void_v<T>
+        requires (std::is_void_v<T>)
     class ResultMonad<T> {
 
     };

@@ -1,6 +1,6 @@
 CXX=clang++ -std=c++20
-CFLAGS= -g -O3 `llvm-config --cxxflags --ldflags --system-libs --libs all` -std=c++20 \
--Wno-unused-function -Wno-unknown-warning-option \
+CFLAGS= -g -O3 `llvm-config --cppflags --ldflags --system-libs --libs all` \
+-Wno-unused-function -Wno-unknown-warning-option -fno-exceptions -fno-rtti \
 -Wpessimizing-move -Wredundant-move -ferror-limit=5
 SRCF = src
 BUILDF = build
