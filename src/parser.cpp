@@ -568,9 +568,15 @@ static ParserFunction<std::vector<std::unique_ptr<FunctionParameterASTNode>>> fu
       return make_result(std::move(params));
     }
 
-    while(isVarTypeFirst()) {
+    if(isVarTypeFirst()) {
       Consume(FunctionParameterASTNode, param, param_decl);
       params.push_back(std::move(param));
+
+      while(CurTok.type == TOKEN_TYPE::COMMA) {
+        getNextToken();
+        Consume(FunctionParameterASTNode, param, param_decl);
+        params.push_back(std::move(param));
+      }
     }
 
     return make_result(std::move(params));
