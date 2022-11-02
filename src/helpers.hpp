@@ -3,6 +3,8 @@
     #include <memory>
     #include <type_traits>
     #include <iostream>
+
+    #include "lexer.hpp"
     
     template <typename Base, typename Derived> std::unique_ptr<Base> unique_ptr_cast(Derived &&p) {
         return std::unique_ptr<Base>(std::make_unique<Derived>(std::move(p)));
@@ -15,6 +17,9 @@
             ErrorT() : message("") {} //std::cout << "Empty error" << std::endl;
             ErrorT(std::string msg): message(msg) {}
             
+            ErrorT(std::string msg, TOKEN tok) {
+                ErrorT(msg, tok.lineNo, tok.columnNo);
+            }
             ErrorT(std::string msg, int line, int col): message(msg) {
                 message = msg + "\n" + std::to_string(line) + ":" + std::to_string(col);
             }

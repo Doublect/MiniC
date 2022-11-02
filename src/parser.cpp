@@ -124,34 +124,29 @@ inline static ResultMonad<ExprASTNode> or_expr();
 //using ParserFunction = std::function<ASTNode()>;
 
 auto type_spec = 
-  []() {
+  []() -> ResultMonad<TypeSpecType> {
     if(isTypeSpecFirst()) {
       TypeSpecType tst = (TypeSpecType) CurTok.type;
       getNextToken();
       return make_result(std::move(tst));
     }
 
-    //TODO: error
-    LogErrorType("Expected type specifier, got: "s + std::to_string(CurTok.type) , TypeSpecType);
-    //getNextToken();
-    //return ResultMonad(TypeSpecType::VOID);
+    return make_result(ErrorT("Expected type specifier, got: "s + std::to_string(CurTok.type)));
   };
 
 auto var_type = 
-  [](){
+  []() -> ResultMonad<VariableType>{
     if(isVarTypeFirst()) {
       VariableType type = (VariableType) CurTok.type;
       getNextToken();
       return make_result(std::move(type));
     }
 
-    getNextToken();
-    //TODO: Error
-    return make_result(VariableType::INT);
+    return make_result(ErrorT("Expected variable type, got: "s + std::to_string(CurTok.type)));
   };
 
 auto ident =
-  [](){
+  []() -> ResultMonad<std::string> {
     if(CurTok.type == TOKEN_TYPE::IDENT) {
       std::string name = CurTok.lexeme;
       getNextToken();
@@ -160,8 +155,7 @@ auto ident =
     std::string name = CurTok.lexeme;
     getNextToken();
 
-    //TODO: Error
-    return make_result(std::move(name));
+    return make_result(ErrorT("Expected identifier, got: "s + std::to_string(CurTok.type), CurTok));
   };
 
 static auto token_type =
@@ -186,52 +180,13 @@ static ResultMonad<TOKEN> expect(TOKEN_TYPE type) {
   return std::move(a);
 }
 
-// static std::vector<TOKEN> matchPattern(std::vector<TOKEN_TYPE> &pattern) {
-//   std::vector<TOKEN> tokens;
-
-//   for(auto token_type: pattern) {
-//     Expect(token_type);
-//     tokens.push_back(CurTok);
-//     getNextToken();
-//   }
-
-//   return tokens;
-// }
-
-// static VariableType coerceVarType(TOKEN_TYPE type) {
-//   if(isVarTypeFirst()) {
-//     return (VariableType) type;
-//   }
-  
-//   //TODO: Error
-//   LogError("Invalid variable type"s);
-//   return VariableType::INT;
-// }
-
-// static ResultMonad<TypeSpecType> coerceTypeSpec(TOKEN_TYPE type) {
-//   if(isTypeSpecFirst()) {
-//     return (TypeSpecType) type;
-//   }
-
-//   //TODO: Error
-//   LogError("Invalid type specifier"s);
-//   return TypeSpecType::VOID;
-// }
-
-// static void coerceIdent() {
-//   int type = CurTok.type;
-//   if(type != TOKEN_TYPE::IDENT) {
-//     LogError("Expected identifier");
-//   }
-// }
-
 ///-----------------------------------------------------------------------------
 /// Expression Parsing
 ///-----------------------------------------------------------------------------
 #pragma region Expression Parsing
 
 static auto literals =
-  []() {
+  []() -> ResultMonad<ExprASTNode> {
     if(CurTok.type == TOKEN_TYPE::INT_LIT) {
       int value = IntVal;
       getNextToken();
@@ -251,12 +206,11 @@ static auto literals =
       return make_result_ptr(unique_ptr_cast<ExprASTNode>(BoolASTNode(CurTok, value)));
     }
 
-    //TODO: ERROR
+    return make_result(ErrorT("Expected literal, got: "s + std::to_string(CurTok.type), CurTok));
   };
 
 static ParserFunction<ExprASTNode> expr = or_expr;
 
-//ParserFunction<std::vector<std::unique_ptr<ExprASTNode>>>
 static ParserFunction<std::vector<std::unique_ptr<ExprASTNode>>> args = 
   []() -> ResultMonad<std::vector<std::unique_ptr<ExprASTNode>>> {
     Expect(TOKEN_TYPE::LPAR);
@@ -544,9 +498,7 @@ inline static ResultMonad<StatementASTNode> stmt() {
       return make_result_ptr(std::move(stmt));
     }
 
-  getNextToken();
-  //TODO: error;
-  return make_result(EmptyStatementASTNode());
+  return make_result(ErrorT("One of: 'if', 'while', 'return', 'block' or an expression was expected", CurTok.lineNo, CurTok.columnNo));
 }
 #pragma endregion
 
