@@ -23,6 +23,7 @@
 
 #include<map>
 #include<memory>
+#include <ostream>
 #include<stack>
 
 #include "code_gen.hpp"
@@ -44,20 +45,12 @@ std::stack<Function *> FunctionStack;
 static AllocaInst *CreateAllocaInst(Function *TheFunction, const std::string &VarName) {
     IRBuilder TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
 
+    std::cout << "Creating alloca for " << VarName << std::endl;
     //Todo: Add support for other types
     return TmpB.CreateAlloca(
         Type::getInt32Ty(*TheContext), 
         0, 
         VarName.c_str());
-}
-
-static AllocaInst *CreateBlockAlloca(BasicBlock *TheBlock, const std::string &VarName) {
-    //IRBuilder TmpB(TheBlock, TheBlock->begin());
-
-    //Create copy
-    std::string Name = VarName;
-    std::cout << "Creating alloca for " << Name << std::endl;
-    return Builder->CreateAlloca(Type::getInt32Ty(*TheContext), 0, Name.c_str());
 }
 
 static Type *GetType(VariableType Type) {
@@ -176,7 +169,8 @@ Value *BinaryASTNode::codegen() {
 
 Value *VariableRefASTNode::codegen() {
     AllocaInst *V = NamedValues[Name];
-
+    //std::cout << "Found variable ref: " << Name << std::endl;
+    //std::cout << Builder->GetInsertBlock()->getModule() << std::endl;
     if(!V) {
         std::cout << "ERORR: Unknown variable name " << Name << std::endl;
         return nullptr;
@@ -224,10 +218,8 @@ Value *AssignmentASTNode::codegen() {
 
 #pragma region Statements
 
+/// BlockASTNode does writes to the parent block, it does not create one by itself
 Value *BlockASTNode::codegen() {
-    BasicBlock *block = BasicBlock::Create(*TheContext, "block", FunctionStack.top());
-    
-    Builder->SetInsertPoint(block);
 
     std::vector<Value *> declCode;
     for(auto &decl: this->Declarations) {
@@ -239,10 +231,7 @@ Value *BlockASTNode::codegen() {
         stmtCode.push_back(stmt->codegen());
     }
 
-    //block->getInstList().insert(block->end(), declCode.begin(), declCode.end());
-    //block->getInstList().insert(block->end(), stmtCode.begin(), stmtCode.end());
-
-    return block;
+    return Builder->GetInsertBlock();
 }
 
 Value *IfElseASTNode::codegen() {
@@ -255,15 +244,19 @@ Value *IfElseASTNode::codegen() {
 
     Function *TheFunction = Builder->GetInsertBlock()->getParent();
 
-    BasicBlock *ThenBB = BasicBlock::Create(*TheContext, "then");
+    BasicBlock *ThenBB = BasicBlock::Create(*TheContext, "then", TheFunction);
     BasicBlock *ElseBB = BasicBlock::Create(*TheContext, "else");
+    BasicBlock *AfterBB = BasicBlock::Create(*TheContext, "after");
 
+    // Jump to respective block, depending on condition
     Builder->CreateCondBr(CondV, ThenBB, ElseBB);
 
     // Then value
     Builder->SetInsertPoint(ThenBB);
 
     Value *ThenV = Then->codegen();
+    Builder->CreateBr(AfterBB);
+
     if(!ThenV)
         return nullptr;
 
@@ -275,6 +268,11 @@ Value *IfElseASTNode::codegen() {
     if(!ElseV)
         return nullptr;
 
+    Builder->CreateBr(AfterBB);
+    TheFunction->getBasicBlockList().push_back(AfterBB);
+
+    Builder->SetInsertPoint(AfterBB);
+
     return TheFunction;
 }
 
@@ -283,6 +281,7 @@ Value *WhileASTNode::codegen() {
     FunctionStack.push(TheFunction);
 
     BasicBlock *CondBB = BasicBlock::Create(*TheContext, "whilecond", TheFunction);
+    BasicBlock *BodyBB =  BasicBlock::Create(*TheContext, "whilebody");
     BasicBlock *AfterBB = BasicBlock::Create(*TheContext, "afterwhile");
 
     Builder->CreateBr(CondBB);
@@ -297,19 +296,20 @@ Value *WhileASTNode::codegen() {
 
     CondV = Builder->CreateICmpNE(CondV, ConstantInt::get(*TheContext, APInt(1, 0, true)), "whilecond");
 
-    BasicBlock *BodyBB = (BasicBlock *)Body->codegen();
+    Builder->CreateCondBr(CondV, BodyBB, AfterBB);
+
+    // Create body
+    TheFunction->getBasicBlockList().push_back(BodyBB);
+    Builder->SetInsertPoint(BodyBB);
+    Body->codegen();
     if(!BodyBB) {
         return nullptr;
     }
-
+    // End of While body, reevaluate condition
     Builder->CreateBr(CondBB);
 
-    Builder->CreateCondBr(CondV, BodyBB, AfterBB);
-
-
-    // End of While body, reevaluate condition
-
     // After
+    TheFunction->getBasicBlockList().push_back(AfterBB);
     Builder->SetInsertPoint(AfterBB);
     FunctionStack.pop();
     return TheFunction;
@@ -345,8 +345,8 @@ Value *AssignmentStmtASTNode::codegen() {
 #pragma region Declarations
 
 Value *VariableDeclASTNode::codegen() {
-    BasicBlock *CurBlock = Builder->GetInsertBlock();
-    AllocaInst *Alloca = CreateBlockAlloca(CurBlock, Name);
+    //BasicBlock *CurBlock = Builder->GetInsertBlock();
+    AllocaInst *Alloca = CreateAllocaInst(FunctionStack.top(), Name);
 
     //TODO: Redeclaration/shadowing
     NamedValues[Name] = Alloca;
@@ -382,7 +382,7 @@ Value *FunctionDeclASTNode::codegen() {
 
     //NamedValues.clear();
     for(auto &arg: F->args()) {
-        AllocaInst *Alloca = CreateBlockAlloca(BB, arg.getName().str());
+        AllocaInst *Alloca = CreateAllocaInst(F, arg.getName().str());
 
         Builder->CreateStore(&arg, Alloca);
 
