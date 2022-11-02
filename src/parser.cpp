@@ -263,7 +263,7 @@ static ParserFunction<ExprASTNode> parentheses_expr =
   []() -> ResultMonad<ExprASTNode> {
     if(CurTok.type == TOKEN_TYPE::LPAR) {
       getNextToken();
-      Consume(ExprASTNode, primary, primary_expr);
+      Consume(ExprASTNode, primary, expr);
       Expect(TOKEN_TYPE::RPAR);
       return make_result_ptr(std::move(primary));
     }
