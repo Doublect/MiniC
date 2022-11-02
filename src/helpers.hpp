@@ -13,11 +13,16 @@
         
         public:
             ErrorT() : message("") {} //std::cout << "Empty error" << std::endl;
-            ErrorT(std::string msg): message(msg) {std::cout << msg << std::endl;}
+            ErrorT(std::string msg): message(msg) {}
+            
+            ErrorT(std::string msg, int line, int col): message(msg) {
+                message = msg + "\n" + std::to_string(line) + ":" + std::to_string(col);
+            }
 
             std::string msg() {
                 return message;
             }
+
     };
 
 

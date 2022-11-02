@@ -174,9 +174,8 @@ static auto token_type =
 static ResultMonad<TOKEN> expect(TOKEN_TYPE type) {
   if(CurTok.type != type) {
     auto str = std::string(std::string("Expected token ") + std::to_string(type) + std::string(" but got ") + std::to_string(CurTok.type));
-    std::cout << "str" << std::endl;
     std::cout << str << std::endl;
-    return ResultMonad<TOKEN>(ErrorT(str));
+    return ResultMonad<TOKEN>(ErrorT(str, lineNo, columnNo));
     //LogError(std::string(std::string("Expected token ") + std::to_string(type) + std::string(" but got ") + std::to_string(CurTok.type)));
     //LogError(std::to_string(lineNo) + ":" + std::to_string(columnNo));
   }
