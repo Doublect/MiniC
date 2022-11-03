@@ -5,7 +5,19 @@
     #include <iostream>
 
     #include "lexer.hpp"
-    
+
+    enum TypeSpecType {
+        VOID = -2,
+        BOOL = -3,
+        INT = -4,
+        FLOAT = -5,
+    };
+
+    enum class VariableType {
+        BOOL = TypeSpecType::BOOL,
+        INT = TypeSpecType::INT,
+        FLOAT = TypeSpecType::FLOAT,
+    };
     template <typename Base, typename Derived> std::unique_ptr<Base> unique_ptr_cast(Derived &&p) {
         return std::unique_ptr<Base>(std::make_unique<Derived>(std::move(p)));
     }
@@ -112,6 +124,7 @@
         return ResultMonad<T>(std::move(val));
     }
 
+    TypeSpecType least_constraining_value(TypeSpecType a, TypeSpecType b);
 
     template<typename T> 
         requires (std::is_void_v<T>)

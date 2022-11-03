@@ -23,11 +23,12 @@
         SC = int(';'),    // semicolon
         COMMA = int(','), // comma
 
+        //DONE: changed order of lexer tokens
         // types
-        INT_TOK = -2,   // "int"
-        VOID_TOK = -3,  // "void"
-        FLOAT_TOK = -4, // "float"
-        BOOL_TOK = -5,  // "bool"
+        VOID_TOK = -2,  // "void"
+        BOOL_TOK = -3,  // "bool"
+        INT_TOK = -4,   // "int"
+        FLOAT_TOK = -5, // "float"
 
         // keywords
         EXTERN = -6,  // "extern"

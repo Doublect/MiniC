@@ -30,7 +30,7 @@
 
 #include "ast.hpp"
 
-#define BuildInt(var, a, b) var != VariableType::FLOAT ? a(L, R, Name) : b(L, R, Name)
+#define BuildInt(var, a, b) var != TypeSpecType::FLOAT ? a(L, R, Name) : b(L, R, Name)
 
 //===----------------------------------------------------------------------===//
 // Code Generation
@@ -41,17 +41,6 @@ std::unique_ptr<Module> TheModule;
 std::unique_ptr<IRBuilder<>> Builder;
 std::map<std::string, AllocaInst *> NamedValues;
 std::stack<Function *> FunctionStack;
-
-static AllocaInst *CreateAllocaInst(Function *TheFunction, const std::string &VarName) {
-    IRBuilder TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
-
-    std::cout << "Creating alloca for " << VarName << std::endl;
-    //Todo: Add support for other types
-    return TmpB.CreateAlloca(
-        Type::getInt32Ty(*TheContext), 
-        0, 
-        VarName.c_str());
-}
 
 static Type *GetType(VariableType Type) {
     switch (Type) {
@@ -74,6 +63,17 @@ static Type *GetType(TypeSpecType tst) {
     }
 }
 
+static AllocaInst *CreateAllocaArg(Function *TheFunction, const std::string &VarName, Type *Type) {
+    IRBuilder TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
+
+    std::cout << "Creating alloca for " << VarName << std::endl;
+    //Todo: Add support for other types
+    return TmpB.CreateAlloca(
+        Type, 
+        0, 
+        VarName.c_str());
+}
+
 #pragma region Expressions
 
 Value *IntASTNode::codegen() {
@@ -87,7 +87,6 @@ Value *FloatASTNode::codegen() {
 }
 
 Value *BoolASTNode::codegen() {
-    //return Constant
     //std::cout << "Found bool: " << Val << std::endl;
     return ConstantInt::get(*TheContext, APInt(32, (int)Val, true));
 }
@@ -110,14 +109,17 @@ Value *UnaryASTNode::codegen() {
     return unary_op_builder(Op, L, "unary");
 }
 
-std::function<Value *(VariableType type, TOKEN_TYPE Op, llvm::Value *L, llvm::Value *R, const llvm::Twine &Name)> operation_function =
-    [](VariableType type, TOKEN_TYPE Op, llvm::Value *L, llvm::Value *R, const llvm::Twine &Name) -> Value* {
+auto operation_function =
+    [](TypeSpecType type, TOKEN_TYPE Op, llvm::Value *L, llvm::Value *R, const llvm::Twine &Name) -> Value* {
         //std::function<Value *(llvm::Value *L, llvm::Value *R, const llvm::Twine &Name)> *func;
         std::vector<Value *> vals{L, R};
         
-        // std::cout << "Op: " << Op << std::endl;
-        // std::cout << "L: " << L->getType()->getTypeID() << std::endl;
-        // std::cout << "R: " << R->getType()->getTypeID() << std::endl;
+        std::cout << "Op: " << Op << std::endl;
+        std::cout << "L: " << std::endl;
+        L->print(llvm::outs());
+        std::cout << std::endl << "R: " << std::endl;
+        R->print(llvm::outs());
+        std::cout << "Type: " << std::to_string((int)type) << std::endl;
         switch(Op) {
             case TOKEN_TYPE::PLUS:
                 return BuildInt(type, Builder->CreateAdd, Builder->CreateFAdd);
@@ -162,9 +164,17 @@ Value *BinaryASTNode::codegen() {
     Value *R = RHS->codegen();
 
     //TODO: type checking
-    VariableType type = VariableType::INT;
+    
+    Type::TypeID typeID = std::min(L->getType()->getTypeID(), R->getType()->getTypeID());
 
-    return operation_function(type, Op, L, R, "binary_op");
+    if(L->getType()->getTypeID() != typeID) {
+        L = Builder->CreateSIToFP(L,Type::getFloatTy(*TheContext), "leftcast");
+    } else if(R->getType()->getTypeID() != typeID) {
+        R = Builder->CreateSIToFP(R,Type::getFloatTy(*TheContext), "rightcast");
+    }
+
+    //TODO: emit warning
+    return operation_function(typeID == Type::TypeID::FloatTyID ? TypeSpecType::FLOAT : TypeSpecType::INT, Op, L, R, "binary_op");
 }
 
 Value *VariableRefASTNode::codegen() {
@@ -172,7 +182,7 @@ Value *VariableRefASTNode::codegen() {
     //std::cout << "Found variable ref: " << Name << std::endl;
     //std::cout << Builder->GetInsertBlock()->getModule() << std::endl;
     if(!V) {
-        std::cout << "ERORR: Unknown variable name " << Name << std::endl;
+        std::cout << "ERROR: Unknown variable name " << Name << std::endl;
         return nullptr;
         // TODO errors
         //return LogErrorV("Undeclared variable name: " + Name);
@@ -316,7 +326,7 @@ Value *WhileASTNode::codegen() {
 }
 
 Value *ReturnStmtASTNode::codegen() {
-    Value *RetVal = this->Expr->codegen();
+    Value *RetVal = Expr ? Expr->codegen() : nullptr;
 
     Builder->CreateRet(RetVal);
 
@@ -346,7 +356,7 @@ Value *AssignmentStmtASTNode::codegen() {
 
 Value *VariableDeclASTNode::codegen() {
     //BasicBlock *CurBlock = Builder->GetInsertBlock();
-    AllocaInst *Alloca = CreateAllocaInst(FunctionStack.top(), Name);
+    AllocaInst *Alloca = CreateAllocaArg(FunctionStack.top(), Name, GetType(Type));
 
     //TODO: Redeclaration/shadowing
     NamedValues[Name] = Alloca;
@@ -382,7 +392,7 @@ Value *FunctionDeclASTNode::codegen() {
 
     //NamedValues.clear();
     for(auto &arg: F->args()) {
-        AllocaInst *Alloca = CreateAllocaInst(F, arg.getName().str());
+        AllocaInst *Alloca = CreateAllocaArg(F, arg.getName().str(), arg.getType());
 
         Builder->CreateStore(&arg, Alloca);
 

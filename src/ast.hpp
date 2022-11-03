@@ -14,19 +14,6 @@
 
 using namespace llvm;
 
-enum class VariableType {
-    INT = -2,
-    FLOAT = -4,
-    BOOL = -5,
-};
-
-enum TypeSpecType {
-    INT = -2,
-    VOID = -3,
-    FLOAT = -4,
-    BOOL = -5,
-};
-
 class ASTNode;
 class StatementASTNode;
 class IntASTNode;
@@ -103,6 +90,7 @@ public:
 
 class ExprASTNode : public StatementASTNode
 {
+protected:
   TypeSpecType Type;
 public:
   Value *codegen() override { return nullptr; };
@@ -117,7 +105,9 @@ class IntASTNode : public ExprASTNode
   std::string Name;
 
 public:
-  IntASTNode(TOKEN tok, int val) : Val(val), Tok(tok) {}
+  IntASTNode(TOKEN tok, int val) : Val(val), Tok(tok) {
+    Type = TypeSpecType::INT;
+  }
   Value *codegen() override;
   std::unique_ptr<ASTPrint> to_ast_print() override
   {
@@ -139,7 +129,9 @@ class FloatASTNode : public ExprASTNode
   std::string Name;
 
 public:
-  FloatASTNode(TOKEN tok, float val) : Val(val), Tok(tok) {}
+  FloatASTNode(TOKEN tok, float val) : Val(val), Tok(tok) {
+    Type = TypeSpecType::FLOAT;
+  }
   Value *codegen() override;
   std::unique_ptr<ASTPrint> to_ast_print() override
   {
@@ -158,7 +150,9 @@ class BoolASTNode : public ExprASTNode
   std::string Name;
 
 public:
-  BoolASTNode(TOKEN tok, bool val) : Val(val), Tok(tok) {}
+  BoolASTNode(TOKEN tok, bool val) : Val(val), Tok(tok) {
+    Type = TypeSpecType::BOOL;
+  }
   Value *codegen() override;
   std::unique_ptr<ASTPrint> to_ast_print() override
   {
@@ -182,7 +176,7 @@ class UnaryASTNode : public ExprASTNode
 
 public:
   UnaryASTNode(TOKEN tok, TOKEN_TYPE op, std::unique_ptr<ExprASTNode> operand)
-      : Op(op), Operand(std::move(operand)), Tok(tok) {}
+      : Op(op), Operand(std::move(operand)), Tok(tok) { Type = Operand->getType(); }
   Value *codegen() override;
 
   std::unique_ptr<ASTPrint> to_ast_print() override
@@ -422,7 +416,9 @@ public:
   {
     auto children = std::vector<std::unique_ptr<ASTPrint>>();
 
-    children.push_back(make_ast_labelled("Expr:", Expr->to_ast_print()));
+    if(Expr) {
+      children.push_back(make_ast_labelled("Expr:", Expr->to_ast_print()));
+    }
 
     return make_ast_print(
         "WhileASTNode",
@@ -505,12 +501,14 @@ public:
 
   std::unique_ptr<ASTPrint> to_ast_print() override
   {
+    auto children = std::vector<std::unique_ptr<ASTPrint>>();
+
+    children.push_back(make_ast_leaf("Type: " + std::to_string((int)Type)));
     return make_ast_print(
         "VariableDeclASTNode",
         "Name: " + Name,
-        std::vector<std::unique_ptr<ASTPrint>>(
-            // ASTPrintLeaf("Type: " + std::to_string(Type)),
-        ));
+        std::move(children)
+        );
   }
   VariableType getType() { return Type; }
   std::string getName() { return Name; }

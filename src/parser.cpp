@@ -16,19 +16,19 @@ using namespace std::string_literals;
 //#define Consume(result) result.success() ? result.unwrap() : { return result; } 
 //#define Consume(variable, result) auto res = result(); if(res.success()) { auto variable = res.unwrap(); } else { return res; }
   //std::cout << boost::stacktrace::stacktrace() << std::endl; 
-#define Consume(type, variable, result) \ 
+#define Consume(type, variable, result) \
   std::unique_ptr<type> variable; \
   { ResultMonad<type> res = result(); \
   if(res.success()) { variable = std::move(res).unwrap(); } else { return res; }}
-#define ConsumeAssign(type, variable, result) \ 
+#define ConsumeAssign(type, variable, result) \
   { ResultMonad<type> res = result(); \
   if(res.success()) { variable = std::move(res).unwrap(); } else { return res; }}
 
-#define ConsumeVal(type, variable, result) \ 
+#define ConsumeVal(type, variable, result) \
   type variable; \
   { ResultMonad<type> res = result(); \
   if(res.success()) { variable = *std::move(res).unwrap().release(); } else { return res; }}
-#define ConsumeAssignVal(type, variable, result) \ 
+#define ConsumeAssignVal(type, variable, result) \
   { ResultMonad<type> res = result(); \
   if(res.success()) { variable = *std::move(res).unwrap_val(); } else { return res; }}
 
@@ -195,6 +195,7 @@ static auto literals =
       return make_result_ptr(unique_ptr_cast<ExprASTNode>(IntASTNode(CurTok, value)));
     } else if(CurTok.type == TOKEN_TYPE::FLOAT_LIT) {
       float value = FloatVal;
+      // std::cout << "Read float: " << value << std::endl;
       getNextToken();
 
       // return ResultMonad(unique_ptr_cast<ExprASTNode>(FloatASTNode(CurTok, value)));
