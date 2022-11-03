@@ -21,7 +21,6 @@
 #include "parser.hpp"
 
 using namespace llvm;
-//using namespace llvm::sys;
 
 extern FILE *pFile;
 

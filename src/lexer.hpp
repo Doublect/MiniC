@@ -3,12 +3,6 @@
     #include<stdio.h>
     #include<string>
 
-    static std::string IdentifierStr; // Filled in if IDENT
-    static int IntVal;                // Filled in if INT_LIT
-    static bool BoolVal;              // Filled in if BOOL_LIT
-    static float FloatVal;            // Filled in if FLOAT_LIT
-    static std::string StringVal;     // Filled in if String Literal
-
     // The lexer returns one of these for known things.
     enum TOKEN_TYPE {
 
@@ -36,8 +30,8 @@
         ELSE = -8,    // "else"
         WHILE = -9,   // "while"
         RETURN = -10, // "return"
-        //TRUE   = -12,     // "true"
-        //FALSE   = -13,     // "false"
+        TRUE   = -12,     // "true"
+        FALSE   = -13,     // "false"
 
         // literals
         INT_LIT = -14,   // [0-9]+

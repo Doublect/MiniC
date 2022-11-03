@@ -67,7 +67,6 @@ static AllocaInst *CreateAllocaArg(Function *TheFunction, const std::string &Var
     IRBuilder TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
 
     std::cout << "Creating alloca for " << VarName << std::endl;
-    //Todo: Add support for other types
     return TmpB.CreateAlloca(
         Type, 
         0, 
@@ -77,17 +76,17 @@ static AllocaInst *CreateAllocaArg(Function *TheFunction, const std::string &Var
 #pragma region Expressions
 
 Value *IntASTNode::codegen() {
-    //std::cout << "Found int: " << Val << std::endl;
+    // std::cout << "Found int: " << Val << std::endl;
     return ConstantInt::get(*TheContext, APInt(32, Val, true));
 }
 
 Value *FloatASTNode::codegen() {
-    //std::cout << "Found float: " << Val << std::endl;
+    // std::cout << "Found float: " << Val << std::endl;
     return ConstantFP::get(*TheContext, APFloat(Val));
 }
 
 Value *BoolASTNode::codegen() {
-    //std::cout << "Found bool: " << Val << std::endl;
+    // std::cout << "Found bool: " << Val << std::endl;
     return ConstantInt::get(*TheContext, APInt(32, (int)Val, true));
 }
 
@@ -101,7 +100,7 @@ std::function<Value*(TOKEN_TYPE Op, llvm::Value *L, const llvm::Twine &Name)> un
             default:
                 return nullptr;
                 //TODO: Error
-        }        
+        }       
     };
 
 Value *UnaryASTNode::codegen() {
@@ -119,7 +118,7 @@ auto operation_function =
         L->print(llvm::outs());
         std::cout << std::endl << "R: " << std::endl;
         R->print(llvm::outs());
-        std::cout << "Type: " << std::to_string((int)type) << std::endl;
+        std::cout << std::endl << "Type: " << std::to_string((int)type) << std::endl;
         switch(Op) {
             case TOKEN_TYPE::PLUS:
                 return BuildInt(type, Builder->CreateAdd, Builder->CreateFAdd);
@@ -163,7 +162,7 @@ Value *BinaryASTNode::codegen() {
     Value *L = LHS->codegen();
     Value *R = RHS->codegen();
 
-    //TODO: type checking
+    //TODO: bool type checking
     
     Type::TypeID typeID = std::min(L->getType()->getTypeID(), R->getType()->getTypeID());
 
@@ -249,8 +248,14 @@ Value *IfElseASTNode::codegen() {
     if(!CondV) {
         return nullptr;
     }
+    
+    // TODO
+    if(CondV->getType()->getTypeID() != Type::TypeID::FloatTyID) {
+        CondV = Builder->CreateICmpNE(CondV, ConstantInt::get(*TheContext, APInt(0, 0, true)), "ifcond");
+    } else {
+        CondV = Builder->CreateFCmpONE(CondV, ConstantFP::get(*TheContext, APFloat(0.0f)), "ifcond");
+    }
 
-    CondV = Builder->CreateICmpNE(CondV, ConstantInt::get(*TheContext, APInt(1, 0, true)), "ifcond");
 
     Function *TheFunction = Builder->GetInsertBlock()->getParent();
 

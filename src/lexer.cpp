@@ -17,6 +17,12 @@
 
 int lineNo, columnNo;
 
+std::string IdentifierStr; // Filled in if IDENT
+int IntVal;                // Filled in if INT_LIT
+bool BoolVal;              // Filled in if BOOL_LIT
+float FloatVal;            // Filled in if FLOAT_LIT
+std::string StringVal;     // Filled in if String Literal
+
 //===----------------------------------------------------------------------===//
 // Lexer
 //===----------------------------------------------------------------------===//

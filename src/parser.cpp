@@ -1,8 +1,10 @@
 #include<deque>
 #include <memory>
 
-#include "helpers.hpp"
 #include "parser.hpp"
+
+#include "helpers.hpp"
+#include "lexer.hpp"
 
 #define BOOST_STACKTRACE_USE_ADDR2LINE
 #include <boost/stacktrace.hpp>
@@ -10,6 +12,12 @@
 FILE *pFile;
 
 extern int lineNo, columnNo;
+
+extern std::string IdentifierStr;
+extern int IntVal;
+extern bool BoolVal;
+extern float FloatVal;
+extern std::string StringVal;     
 
 using namespace std::string_literals;
 
