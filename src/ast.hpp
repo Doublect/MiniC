@@ -34,7 +34,6 @@ class BlockASTNode;
 class IfElseASTNode;
 class WhileASTNode;
 class ReturnStmtASTNode;
-class AssignmentStmtASTNode;
 class EmptyStatementASTNode;
 
 // Decls
@@ -428,30 +427,6 @@ public:
   }
 };
 
-class AssignmentStmtASTNode : public StatementASTNode
-{
-  std::string Name;
-  std::unique_ptr<ExprASTNode> RHS;
-  TOKEN Tok;
-
-public:
-  AssignmentStmtASTNode(TOKEN tok, const std::string &Name,
-                        std::unique_ptr<ExprASTNode> RHS)
-      : Name(Name), RHS(std::move(RHS)) {}
-  Value *codegen() override;
-  std::unique_ptr<ASTPrint> to_ast_print() override
-  {
-    auto children = std::vector<std::unique_ptr<ASTPrint>>();
-
-    children.push_back(RHS->to_ast_print());
-
-    return make_ast_print(
-        "AssignmentStmt",
-        "Name: " + Name,
-        std::move(children)
-        );
-  }
-};
 class EmptyStatementASTNode : public StatementASTNode
 {
 

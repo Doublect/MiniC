@@ -482,14 +482,14 @@ static ParserFunction<ReturnStmtASTNode> return_stmt =
     return make_result(ReturnStmtASTNode(std::move(exp)));
   };
 
-static ParserFunction<AssignmentStmtASTNode> assign_stmt =
-  []() -> ResultMonad<AssignmentStmtASTNode> {
+static ParserFunction<AssignmentASTNode> assign_stmt =
+  []() -> ResultMonad<AssignmentASTNode> {
     ConsumeVal(std::string, name, ident);
     Expect(TOKEN_TYPE::ASSIGN);
     Consume(ExprASTNode, exp, expr);
     Expect(TOKEN_TYPE::SC);
 
-    return make_result(AssignmentStmtASTNode(CurTok, name, std::move(exp)));
+    return make_result(AssignmentASTNode(CurTok, name, std::move(exp)));
   };
 
 inline static ResultMonad<StatementASTNode> stmt() {

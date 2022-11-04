@@ -23,7 +23,7 @@
 
 #include<map>
 #include<memory>
-#include <ostream>
+#include<ostream>
 #include<stack>
 
 #include "code_gen.hpp"
@@ -39,8 +39,48 @@
 std::unique_ptr<LLVMContext> TheContext;
 std::unique_ptr<Module> TheModule;
 std::unique_ptr<IRBuilder<>> Builder;
-std::map<std::string, AllocaInst *> NamedValues;
 std::stack<Function *> FunctionStack;
+
+class VariableScopeManager {
+    std::map<std::string, std::stack<AllocaInst *>> NamedValues;
+    std::stack<std::set<std::string>> ScopeStack;
+
+public:
+    VariableScopeManager() {
+        ScopeStack.push(std::set<std::string>());
+    }
+
+    void pushScope() {
+        ScopeStack.push(std::set<std::string>());
+    }
+
+    void popScope() {
+        for (auto &Name : ScopeStack.top()) {
+            NamedValues[Name].pop();
+        }
+        ScopeStack.pop();
+    }
+
+    void addVariable(const std::string &Name, AllocaInst *Alloca) {
+        NamedValues[Name].push(Alloca);
+        ScopeStack.top().insert(Name);
+    }
+
+    void allocateVariable(const std::string &Name, AllocaInst *Alloca) {
+        NamedValues[Name].pop();
+        NamedValues[Name].push(Alloca);
+    }
+
+    AllocaInst *getVariable(const std::string &Name) {
+        if (NamedValues.find(Name) == NamedValues.end()) {
+            // TODO: Error
+            return nullptr;
+        }
+        return NamedValues[Name].top();
+    }
+};
+
+VariableScopeManager VariableScope;
 
 static Type *GetType(VariableType Type) {
     switch (Type) {
@@ -94,9 +134,14 @@ std::function<Value*(TOKEN_TYPE Op, llvm::Value *L, const llvm::Twine &Name)> un
     [](TOKEN_TYPE Op, llvm::Value *L, const llvm::Twine &Name) -> Value *{
         switch(Op) {
             case TOKEN_TYPE::MINUS:
-                return Builder->CreateFNeg(L, Name);
+                return L->getType()->getTypeID() == Type::TypeID::FloatTyID ? 
+                    Builder->CreateFNeg(L, Name) : 
+                    Builder->CreateNeg(L, Name);
             case TOKEN_TYPE::NOT:
-                return Builder->CreateNot(L, Name);
+                //return Builder->CreateNot(L, Name);
+                return L->getType()->getTypeID() == Type::TypeID::FloatTyID ? 
+                    Builder->CreateFCmpOEQ(L, ConstantFP::get(*TheContext, APFloat(0.0)), Name) : 
+                    Builder->CreateICmpEQ(L, ConstantInt::get(*TheContext, APInt(32, 0, true)), Name); 
             default:
                 return nullptr;
                 //TODO: Error
@@ -177,7 +222,7 @@ Value *BinaryASTNode::codegen() {
 }
 
 Value *VariableRefASTNode::codegen() {
-    AllocaInst *V = NamedValues[Name];
+    AllocaInst *V = VariableScope.getVariable(Name);
     //std::cout << "Found variable ref: " << Name << std::endl;
     //std::cout << Builder->GetInsertBlock()->getModule() << std::endl;
     if(!V) {
@@ -206,11 +251,6 @@ Value *CallExprAST::codegen() {
 }
 
 Value *AssignmentASTNode::codegen() {
-    if(NamedValues.find(Name) == NamedValues.end()) {
-        std::cout << "ERROR: Failed find variable" << std::endl;
-        //TODO: throw error
-    }
-
     Value *Val = RHS->codegen();
 
     if(!Val) {
@@ -218,7 +258,7 @@ Value *AssignmentASTNode::codegen() {
         //return nullptr;
     }
 
-    AllocaInst *Alloca = NamedValues[Name];
+    AllocaInst *Alloca = VariableScope.getVariable(Name);
     Builder->CreateStore(Val, Alloca);
     return Val;
 }
@@ -251,7 +291,7 @@ Value *IfElseASTNode::codegen() {
     
     // TODO
     if(CondV->getType()->getTypeID() != Type::TypeID::FloatTyID) {
-        CondV = Builder->CreateICmpNE(CondV, ConstantInt::get(*TheContext, APInt(0, 0, true)), "ifcond");
+        CondV = Builder->CreateICmpNE(CondV, ConstantInt::get(*TheContext, APInt(32, 0, true)), "ifcond");
     } else {
         CondV = Builder->CreateFCmpONE(CondV, ConstantFP::get(*TheContext, APFloat(0.0f)), "ifcond");
     }
@@ -269,6 +309,9 @@ Value *IfElseASTNode::codegen() {
     // Then value
     Builder->SetInsertPoint(ThenBB);
 
+    // Create scope for both then and else (as only one of the get executed)
+    VariableScope.pushScope();
+
     Value *ThenV = Then->codegen();
     Builder->CreateBr(AfterBB);
 
@@ -282,6 +325,9 @@ Value *IfElseASTNode::codegen() {
     Value *ElseV = Else->codegen();
     if(!ElseV)
         return nullptr;
+
+    // Pop variable scope
+    VariableScope.popScope();
 
     Builder->CreateBr(AfterBB);
     TheFunction->getBasicBlockList().push_back(AfterBB);
@@ -309,9 +355,18 @@ Value *WhileASTNode::codegen() {
         return nullptr;
     }
 
-    CondV = Builder->CreateICmpNE(CondV, ConstantInt::get(*TheContext, APInt(1, 0, true)), "whilecond");
+    //CondV = Builder->CreateICmpNE(CondV, ConstantInt::get(*TheContext, APInt(32, 0, true)), "whilecond");
+
+    if(CondV->getType()->getTypeID() != Type::TypeID::FloatTyID) {
+        CondV = Builder->CreateICmpNE(CondV, ConstantInt::get(*TheContext, APInt(32, 0, true)), "whilecond");
+    } else {
+        CondV = Builder->CreateFCmpONE(CondV, ConstantFP::get(*TheContext, APFloat(0.0f)), "whilecond");
+    }
 
     Builder->CreateCondBr(CondV, BodyBB, AfterBB);
+
+    // Create new scope for body 
+    VariableScope.pushScope();
 
     // Create body
     TheFunction->getBasicBlockList().push_back(BodyBB);
@@ -326,6 +381,9 @@ Value *WhileASTNode::codegen() {
     // After
     TheFunction->getBasicBlockList().push_back(AfterBB);
     Builder->SetInsertPoint(AfterBB);
+
+    // Pop scope
+    VariableScope.popScope();
     FunctionStack.pop();
     return TheFunction;
 }
@@ -338,23 +396,6 @@ Value *ReturnStmtASTNode::codegen() {
     return RetVal;
 }
 
-Value *AssignmentStmtASTNode::codegen() {
-    if(NamedValues.find(Name) == NamedValues.end()) {
-        //TODO: throw error
-    }
-
-    Value *Val = RHS->codegen();
-
-    if(!Val) {
-        //TODO: throw error
-        //return nullptr;
-    }
-
-    AllocaInst *Alloca = NamedValues[Name];
-    Builder->CreateStore(Val, Alloca);
-    return Val;
-}
-
 #pragma endregion
 
 #pragma region Declarations
@@ -363,8 +404,7 @@ Value *VariableDeclASTNode::codegen() {
     //BasicBlock *CurBlock = Builder->GetInsertBlock();
     AllocaInst *Alloca = CreateAllocaArg(FunctionStack.top(), Name, GetType(Type));
 
-    //TODO: Redeclaration/shadowing
-    NamedValues[Name] = Alloca;
+    VariableScope.addVariable(Name, Alloca);
     std::cout << "Declaring variable " << Name << std::endl;
 
     return Alloca;
@@ -395,20 +435,20 @@ Value *FunctionDeclASTNode::codegen() {
     Builder->SetInsertPoint(BB);
 
 
-    //NamedValues.clear();
+    // Create a new scope for the function
+    VariableScope.pushScope();
     for(auto &arg: F->args()) {
         AllocaInst *Alloca = CreateAllocaArg(F, arg.getName().str(), arg.getType());
 
         Builder->CreateStore(&arg, Alloca);
-
-        NamedValues[arg.getName().str()] = Alloca;
+        VariableScope.addVariable(arg.getName().str(), Alloca);
     }
 
     // Do the body's code generation
     Body->codegen();
 
 
-    //TODO: REMOVE FUNC PARAMS from named values
+    VariableScope.popScope();
     FunctionStack.pop();
     // Ensure the function is valid
     if(verifyFunction(*F)) {
