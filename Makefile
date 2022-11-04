@@ -9,11 +9,9 @@ DEPS = $(BUILDF)/ast.o $(BUILDF)/ast_print.o $(BUILDF)/code_gen.o $(BUILDF)/help
 mccomp: $(SRCF)/mccomp.cpp $(DEPS)
 	$(CXX) $^ $(CFLAGS) -o mccomp
 
-$(BUILDF)/%.o: $(SRCF)/%.cpp $(SRCF)/%.hpp $(BUILDF)
+$(BUILDF)/%.o: $(SRCF)/%.cpp $(SRCF)/%.hpp
+	@mkdir -p build
 	$(CXX) $< -c -o $@ -g -O3
-
-$(BUILDF):
-	mkdir -p build
 
 clean:
 	rm -rf build

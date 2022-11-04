@@ -30,7 +30,7 @@
 
 #include "ast.hpp"
 
-#define BuildInt(var, a, b) var != TypeSpecType::FLOAT ? a(L, R, Name) : b(L, R, Name)
+#define BuildInt(var, a, b) var != Type::TypeID::FloatTyID ? a(L, R, Name) : b(L, R, Name)
 
 //===----------------------------------------------------------------------===//
 // Code Generation
@@ -39,7 +39,6 @@
 std::unique_ptr<LLVMContext> TheContext;
 std::unique_ptr<Module> TheModule;
 std::unique_ptr<IRBuilder<>> Builder;
-std::stack<Function *> FunctionStack;
 
 class VariableScopeManager {
     std::map<std::string, std::stack<AllocaInst *>> NamedValues;
@@ -99,7 +98,7 @@ Value *ensureFloat(Value *V) {
     }
 
     V = ensureInteger(V);
-    return Builder->CreateSIToFP(V, Type::getDoubleTy(*TheContext), "floattmp");
+    return Builder->CreateSIToFP(V, Type::getFloatTy(*TheContext), "floattmp");
 }
 
 static Type *GetType(VariableType Type) {
@@ -174,7 +173,7 @@ Value *UnaryASTNode::codegen() {
 }
 
 auto operation_function =
-    [](TypeSpecType type, TOKEN_TYPE Op, llvm::Value *L, llvm::Value *R, const llvm::Twine &Name) -> Value* {
+    [](Type::TypeID type, TOKEN_TYPE Op, llvm::Value *L, llvm::Value *R, const llvm::Twine &Name) -> Value* {
         //std::function<Value *(llvm::Value *L, llvm::Value *R, const llvm::Twine &Name)> *func;
         std::vector<Value *> vals{L, R};
         
@@ -240,8 +239,15 @@ Value *BinaryASTNode::codegen() {
         R = ensureFloat(R);
     }
 
+    auto res = operation_function(typeID, Op, L, R, "binary_op");
+
+    if(typeID == Type::TypeID::IntegerTyID) {
+        res = ensureInteger(res);
+    } else {
+        res = ensureFloat(res);
+    }
     //TODO: emit warning
-    return ensureInteger(operation_function(typeID == Type::TypeID::FloatTyID ? TypeSpecType::FLOAT : TypeSpecType::INT, Op, L, R, "binary_op"));
+    return res;
 }
 
 Value *VariableRefASTNode::codegen() {
@@ -511,12 +517,12 @@ Value *ProgramASTNode::codegen() {
     InitializeModule();
 
     std::vector<Value *> externDeclCode;
-    for(auto &decl: this->ExternDeclarations) {
+    for(auto &decl: ExternDeclarations) {
         externDeclCode.push_back(decl->codegen());
     }
 
     std::vector<Value *> declCode;
-    for(auto &decl: this->Declarations) {
+    for(auto &decl: Declarations) {
         declCode.push_back(decl->codegen());
     }
 
