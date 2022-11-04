@@ -82,6 +82,26 @@ public:
 
 VariableScopeManager VariableScope;
 
+Value *ensureInteger(Value *V) {
+    if (V->getType()->isIntegerTy()) {
+        if(V->getType()->getIntegerBitWidth() == 1) {
+            return Builder->CreateZExt(V, Type::getInt32Ty(*TheContext), "bool_to_int");
+        }
+        return V;
+    }
+    // TODO: disallow
+    return Builder->CreateFPToSI(V, Type::getInt32Ty(*TheContext), "inttmp");
+}
+
+Value *ensureFloat(Value *V) {
+    if (V->getType()->isFloatingPointTy()) {
+        return V;
+    }
+
+    V = ensureInteger(V);
+    return Builder->CreateSIToFP(V, Type::getDoubleTy(*TheContext), "floattmp");
+}
+
 static Type *GetType(VariableType Type) {
     switch (Type) {
         case VariableType::INT:
@@ -150,7 +170,7 @@ std::function<Value*(TOKEN_TYPE Op, llvm::Value *L, const llvm::Twine &Name)> un
 
 Value *UnaryASTNode::codegen() {
     Value *L = Operand->codegen();
-    return unary_op_builder(Op, L, "unary");
+    return ensureInteger(unary_op_builder(Op, L, "unary"));
 }
 
 auto operation_function =
@@ -211,14 +231,17 @@ Value *BinaryASTNode::codegen() {
     
     Type::TypeID typeID = std::min(L->getType()->getTypeID(), R->getType()->getTypeID());
 
-    if(L->getType()->getTypeID() != typeID) {
-        L = Builder->CreateSIToFP(L,Type::getFloatTy(*TheContext), "leftcast");
-    } else if(R->getType()->getTypeID() != typeID) {
-        R = Builder->CreateSIToFP(R,Type::getFloatTy(*TheContext), "rightcast");
+    if(typeID == Type::TypeID::IntegerTyID) {
+        L = ensureInteger(L);
+        R = ensureInteger(R);
+    }
+    if(typeID == Type::TypeID::FloatTyID) {
+        L = ensureFloat(L);
+        R = ensureFloat(R);
     }
 
     //TODO: emit warning
-    return operation_function(typeID == Type::TypeID::FloatTyID ? TypeSpecType::FLOAT : TypeSpecType::INT, Op, L, R, "binary_op");
+    return ensureInteger(operation_function(typeID == Type::TypeID::FloatTyID ? TypeSpecType::FLOAT : TypeSpecType::INT, Op, L, R, "binary_op"));
 }
 
 Value *VariableRefASTNode::codegen() {
@@ -339,7 +362,6 @@ Value *IfElseASTNode::codegen() {
 
 Value *WhileASTNode::codegen() {
     Function *TheFunction = Builder->GetInsertBlock()->getParent();
-    FunctionStack.push(TheFunction);
 
     BasicBlock *CondBB = BasicBlock::Create(*TheContext, "whilecond", TheFunction);
     BasicBlock *BodyBB =  BasicBlock::Create(*TheContext, "whilebody");
@@ -384,7 +406,6 @@ Value *WhileASTNode::codegen() {
 
     // Pop scope
     VariableScope.popScope();
-    FunctionStack.pop();
     return TheFunction;
 }
 
@@ -401,8 +422,9 @@ Value *ReturnStmtASTNode::codegen() {
 #pragma region Declarations
 
 Value *VariableDeclASTNode::codegen() {
-    //BasicBlock *CurBlock = Builder->GetInsertBlock();
-    AllocaInst *Alloca = CreateAllocaArg(FunctionStack.top(), Name, GetType(Type));
+    Function *TheFunction = Builder->GetInsertBlock()->getParent();
+
+    AllocaInst *Alloca = CreateAllocaArg(TheFunction, Name, GetType(Type));
 
     VariableScope.addVariable(Name, Alloca);
     std::cout << "Declaring variable " << Name << std::endl;
@@ -423,7 +445,6 @@ Value *FunctionDeclASTNode::codegen() {
 
     Function *F = Function::Create(FT, Function::ExternalLinkage, Name, TheModule.get());
 
-    FunctionStack.push(F);
     for(auto &arg : F->args()) {
         arg.setName(Args[arg.getArgNo()]->getName());
     }
@@ -449,7 +470,6 @@ Value *FunctionDeclASTNode::codegen() {
 
 
     VariableScope.popScope();
-    FunctionStack.pop();
     // Ensure the function is valid
     if(verifyFunction(*F)) {
         return F;

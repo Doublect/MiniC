@@ -83,7 +83,7 @@ int main(int argc, char **argv) {
     std::cout << "Successful Parsing" << std::endl;
     auto AST = std::move(res).unwrap();
     
-    AST->to_ast_print()->printAST();
+    AST->to_ast_print()->printAST("", true);
 
     AST->codegen();
   }
