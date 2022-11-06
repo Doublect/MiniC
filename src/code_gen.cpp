@@ -41,7 +41,7 @@ std::unique_ptr<Module> TheModule;
 std::unique_ptr<IRBuilder<>> Builder;
 
 class VariableScopeManager {
-    std::map<std::string, std::stack<AllocaInst *>> NamedValues;
+    std::map<std::string, std::stack<Value *>> NamedValues;
     std::stack<std::set<std::string>> ScopeStack;
 
 public:
@@ -65,12 +65,17 @@ public:
         ScopeStack.top().insert(Name);
     }
 
+    void addVariable(const std::string &Name, GlobalVariable *Global) {
+        NamedValues[Name].push(Global);
+        ScopeStack.top().insert(Name);
+    }
+
     void allocateVariable(const std::string &Name, AllocaInst *Alloca) {
         NamedValues[Name].pop();
         NamedValues[Name].push(Alloca);
     }
 
-    AllocaInst *getVariable(const std::string &Name) {
+    Value *getVariable(const std::string &Name) {
         if (NamedValues.find(Name) == NamedValues.end()) {
             // TODO: Error
             return nullptr;
@@ -89,7 +94,7 @@ Value *ensureInteger(Value *V) {
         return V;
     }
     // TODO: disallow
-    return Builder->CreateFPToSI(V, Type::getInt32Ty(*TheContext), "inttmp");
+    //return Builder->CreateFPToSI(V, Type::getInt32Ty(*TheContext), "inttmp");
 }
 
 Value *ensureFloat(Value *V) {
@@ -230,6 +235,8 @@ Value *BinaryASTNode::codegen() {
     
     Type::TypeID typeID = std::min(L->getType()->getTypeID(), R->getType()->getTypeID());
 
+    // std::cout << L->getType()->getTypeID() << " " << R->getType()->getTypeID() << std::endl;
+
     if(typeID == Type::TypeID::IntegerTyID) {
         L = ensureInteger(L);
         R = ensureInteger(R);
@@ -251,7 +258,7 @@ Value *BinaryASTNode::codegen() {
 }
 
 Value *VariableRefASTNode::codegen() {
-    AllocaInst *V = VariableScope.getVariable(Name);
+    Value *V = VariableScope.getVariable(Name);
     //std::cout << "Found variable ref: " << Name << std::endl;
     //std::cout << Builder->GetInsertBlock()->getModule() << std::endl;
     if(!V) {
@@ -261,7 +268,14 @@ Value *VariableRefASTNode::codegen() {
         //return LogErrorV("Undeclared variable name: " + Name);
     }
     // std::cout << "Found variable: " << Name << " Loading type: " << V->getAllocatedType()->getTypeID() << std::endl;
-    return Builder->CreateLoad(V->getAllocatedType(), V, Name.c_str());
+    llvm::Type *type;
+    if(V->getType()->getTypeID() == Type::TypeID::PointerTyID) {
+        type = V->getType()->getPointerElementType();
+    } else {
+        type = V->getType();
+    }
+
+    return Builder->CreateLoad(type, V, Name.c_str());
 }
 
 Value *CallExprAST::codegen() {
@@ -287,7 +301,7 @@ Value *AssignmentASTNode::codegen() {
         //return nullptr;
     }
 
-    AllocaInst *Alloca = VariableScope.getVariable(Name);
+    Value *Alloca = VariableScope.getVariable(Name);
     Builder->CreateStore(Val, Alloca);
     return Val;
 }
@@ -428,14 +442,20 @@ Value *ReturnStmtASTNode::codegen() {
 #pragma region Declarations
 
 Value *VariableDeclASTNode::codegen() {
-    Function *TheFunction = Builder->GetInsertBlock()->getParent();
+    if(Builder->GetInsertBlock() == nullptr) {
+        GlobalVariable* g =
+            new GlobalVariable(*TheModule, GetType(Type), false, GlobalValue::CommonLinkage, nullptr, Name);
 
-    AllocaInst *Alloca = CreateAllocaArg(TheFunction, Name, GetType(Type));
+        VariableScope.addVariable(Name, g);
+        return g;
+    } else {
+        Function *TheFunction = Builder->GetInsertBlock()->getParent();
+        AllocaInst *Alloca = CreateAllocaArg(TheFunction, Name, GetType(Type));
 
-    VariableScope.addVariable(Name, Alloca);
-    std::cout << "Declaring variable " << Name << std::endl;
-
-    return Alloca;
+        VariableScope.addVariable(Name, Alloca);
+        std::cout << "Declaring variable " << Name << std::endl;
+        return Alloca;
+    }
 }
 
 Value *FunctionDeclASTNode::codegen() {
@@ -450,7 +470,6 @@ Value *FunctionDeclASTNode::codegen() {
     FunctionType *FT = FunctionType::get(GetType(ReturnType), ArgsTypes, false);
 
     Function *F = Function::Create(FT, Function::ExternalLinkage, Name, TheModule.get());
-
     for(auto &arg : F->args()) {
         arg.setName(Args[arg.getArgNo()]->getName());
     }
