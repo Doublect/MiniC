@@ -1,0 +1,27 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "C++ Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "targetArchitecture": "x64",
+            "program": "${workspaceRoot}/mccomp",
+            "args": ["${workspaceRoot}/tests/while/while.c"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceRoot}",
+            "environment": [],
+            "externalConsole": false,
+            "linux": {
+                "MIMode": "gdb"
+            },
+            "osx": {
+                "MIMode": "lldb"
+            },
+            "windows": {
+                "MIMode": "gdb"
+            }
+        },
+        // attach here, which I don't care about
+    ]
+    }
