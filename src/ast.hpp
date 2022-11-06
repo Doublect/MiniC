@@ -381,10 +381,10 @@ public:
 class WhileASTNode : public StatementASTNode
 {
   std::unique_ptr<ExprASTNode> Cond;
-  std::unique_ptr<BlockASTNode> Body;
+  std::unique_ptr<StatementASTNode> Body;
 
 public:
-  WhileASTNode(std::unique_ptr<ExprASTNode> Cond, std::unique_ptr<BlockASTNode> Body)
+  WhileASTNode(std::unique_ptr<ExprASTNode> Cond, std::unique_ptr<StatementASTNode> Body)
       : Cond(std::move(Cond)), Body(std::move(Body)) {}
   Value *codegen() override;
 

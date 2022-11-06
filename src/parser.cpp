@@ -440,7 +440,7 @@ static ParserFunction<WhileASTNode> while_stmt =
     Expect(TOKEN_TYPE::LPAR);
     Consume(ExprASTNode, condition, expr);
     Expect(TOKEN_TYPE::RPAR);
-    Consume(BlockASTNode, body, stmt);
+    Consume(StatementASTNode, body, stmt);
 
     return make_result(WhileASTNode(std::move(condition), std::move(body)));
   };
@@ -469,19 +469,19 @@ static ParserFunction<AssignmentASTNode> assign_stmt =
   };
 
 inline static ResultMonad<StatementASTNode> stmt() {
-    if(CurTok.type == TOKEN_TYPE::IF) {
-      return if_stmt();
-    } else if(CurTok.type == TOKEN_TYPE::WHILE) {
-      return while_stmt();
-    } else if(CurTok.type == TOKEN_TYPE::RETURN) {
-      return return_stmt();
-    } else if(CurTok.type == TOKEN_TYPE::LBRA) {
-      return block();
-    } else if(isExprFirst()) {
-      Consume(ExprASTNode, stmt, expr);
-      Expect(TOKEN_TYPE::SC);
-      return make_result_ptr(std::move(stmt));
-    }
+  if(CurTok.type == TOKEN_TYPE::IF) {
+    return if_stmt();
+  } else if(CurTok.type == TOKEN_TYPE::WHILE) {
+    return while_stmt();
+  } else if(CurTok.type == TOKEN_TYPE::RETURN) {
+    return return_stmt();
+  } else if(CurTok.type == TOKEN_TYPE::LBRA) {
+    return block();
+  } else if(isExprFirst()) {
+    Consume(ExprASTNode, stmt, expr);
+    Expect(TOKEN_TYPE::SC);
+    return make_result_ptr(std::move(stmt));
+  }
 
   return make_result(ErrorT("One of: 'if', 'while', 'return', 'block' or an expression was expected", CurTok.lineNo, CurTok.columnNo));
 }
