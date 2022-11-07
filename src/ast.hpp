@@ -362,8 +362,8 @@ public:
 
     children.push_back(make_ast_labelled("Cond:", Cond->to_ast_print()));
     children.push_back(make_ast_labelled("Then:", Then->to_ast_print()));
-    // TODO: Check if else has body
-    children.push_back(make_ast_labelled("Else:", Else->to_ast_print()));
+    if(Else)
+      children.push_back(make_ast_labelled("Else:", Else->to_ast_print()));
 
     return make_ast_print(
         "IfElseASTNode",

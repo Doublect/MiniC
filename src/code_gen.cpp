@@ -29,6 +29,7 @@
 #include "code_gen.hpp"
 
 #include "ast.hpp"
+#include "helpers.hpp"
 
 #define BuildInt(var, a, b) var != Type::TypeID::FloatTyID ? a(L, R, Name) : b(L, R, Name)
 
@@ -94,7 +95,7 @@ Value *ensureInteger(Value *V) {
         return V;
     }
     // TODO: disallow
-    //return Builder->CreateFPToSI(V, Type::getInt32Ty(*TheContext), "inttmp");
+    return Builder->CreateFPToSI(V, Type::getInt32Ty(*TheContext), "inttmp");
 }
 
 Value *ensureFloat(Value *V) {
@@ -128,7 +129,7 @@ static Type *GetType(TypeSpecType tst) {
 }
 
 static AllocaInst *CreateAllocaArg(Function *TheFunction, const std::string &VarName, Type *Type) {
-    IRBuilder TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
+    IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
 
     std::cout << "Creating alloca for " << VarName << std::endl;
     return TmpB.CreateAlloca(
@@ -164,8 +165,8 @@ std::function<Value*(TOKEN_TYPE Op, llvm::Value *L, const llvm::Twine &Name)> un
             case TOKEN_TYPE::NOT:
                 //return Builder->CreateNot(L, Name);
                 return L->getType()->getTypeID() == Type::TypeID::FloatTyID ? 
-                    Builder->CreateFCmpOEQ(L, ConstantFP::get(*TheContext, APFloat(0.0)), Name) : 
-                    Builder->CreateICmpEQ(L, ConstantInt::get(*TheContext, APInt(32, 0, true)), Name); 
+                    ensureInteger(Builder->CreateFCmpOEQ(L, ConstantFP::get(*TheContext, APFloat(0.0)), Name)) : 
+                    ensureInteger(Builder->CreateICmpEQ(L, ConstantInt::get(*TheContext, APInt(32, 0, true)), Name)); 
             default:
                 return nullptr;
                 //TODO: Error
@@ -174,7 +175,7 @@ std::function<Value*(TOKEN_TYPE Op, llvm::Value *L, const llvm::Twine &Name)> un
 
 Value *UnaryASTNode::codegen() {
     Value *L = Operand->codegen();
-    return ensureInteger(unary_op_builder(Op, L, "unary"));
+    return unary_op_builder(Op, L, "unary");
 }
 
 auto operation_function =
@@ -365,9 +366,14 @@ Value *IfElseASTNode::codegen() {
     TheFunction->getBasicBlockList().push_back(ElseBB);
     Builder->SetInsertPoint(ElseBB);
 
-    Value *ElseV = Else->codegen();
-    if(!ElseV)
-        return nullptr;
+    if(Else) {
+        Value *ElseV = Else->codegen();
+
+        if(!ElseV)
+            return nullptr;
+    }
+    
+    Builder->CreateBr(AfterBB);
 
     // Pop variable scope
     VariableScope.popScope();
@@ -443,8 +449,11 @@ Value *ReturnStmtASTNode::codegen() {
 
 Value *VariableDeclASTNode::codegen() {
     if(Builder->GetInsertBlock() == nullptr) {
+        Constant *consta = Type == VariableType::FLOAT ? (Constant *)ConstantFP::get(*TheContext, APFloat(0.0f)) : (Constant *)ConstantInt::get(*TheContext, APInt(32, 0, true));
         GlobalVariable* g =
-            new GlobalVariable(*TheModule, GetType(Type), false, GlobalValue::CommonLinkage, nullptr, Name);
+            new GlobalVariable(*TheModule, GetType(Type), false, GlobalValue::CommonLinkage, consta, Name);
+        
+        //std::cout << "Global variable: " << (g->getType()->getTypeID() == Type::TypeID::PointerTyID) << std::endl;
 
         VariableScope.addVariable(Name, g);
         return g;

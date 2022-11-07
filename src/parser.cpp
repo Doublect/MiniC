@@ -1,5 +1,6 @@
 #include<deque>
-#include <memory>
+#include<memory>
+#include<optional>
 
 #include "parser.hpp"
 
@@ -20,7 +21,7 @@ using namespace std::string_literals;
 
 #define ConsumeAssign(type, variable, result) \
   { ResultMonad<type> res = result(); \
-  if(res.success()) { variable = std::move(res).unwrap(); } else { std::cout << "type" << std::endl; return res; }}
+  if(res.success()) { variable = std::move(res).unwrap(); } else { return res; }}
 #define Consume(type, variable, result) \
   std::unique_ptr<type> variable; \
   ConsumeAssign(type, variable, result);
@@ -31,6 +32,13 @@ using namespace std::string_literals;
 #define ConsumeVal(type, variable, result) \
   type variable; \
   ConsumeAssignVal(type, variable, result);
+
+#define ConsumeAssignNoCall(type, variable, result) \
+  { ResultMonad<type> res = result; \
+  if(res.success()) { variable = std::move(res).unwrap(); } else { return res; }}
+#define ConsumeNoCall(type, variable, result) \
+  std::unique_ptr<type> variable; \
+  ConsumeAssignNoCall(type, variable, result);
 
 #define LogError(string) \
   return ResultMonad<void>(ErrorT(string));
@@ -109,8 +117,6 @@ static bool isStmtFirst() {
 static bool isIdent() {
   return CurTok.type == TOKEN_TYPE::IDENT;
 }
-
-inline static ResultMonad<ExprASTNode> or_expr();
 
 ///----------------------------------------------------------------------------
 /// Parser Errors
@@ -206,7 +212,12 @@ static auto literals =
     return make_result(ErrorT("Expected literal, got: "s + std::to_string(CurTok.type), CurTok));
   };
 
-static ParserFunction<ExprASTNode> expr = or_expr;
+inline static ResultMonad<ExprASTNode> or_expr(std::optional<std::unique_ptr<ExprASTNode>> p);
+//ParserFunction<ExprASTNode, std::optional<std::unique_ptr<ExprASTNode>>> or_expr;
+
+static ParserFunction<ExprASTNode> expr = []() {
+  return or_expr(std::nullopt);
+};
 
 static ParserFunction<std::vector<std::unique_ptr<ExprASTNode>>> args = 
   []() -> ResultMonad<std::vector<std::unique_ptr<ExprASTNode>>> {
@@ -265,6 +276,37 @@ static ParserFunction<ExprASTNode> parentheses_expr =
     return primary_expr();
   };
 
+inline auto generic_binary_expr(ParserFunction<ExprASTNode, std::optional<std::unique_ptr<ExprASTNode>>> next, std::vector<TOKEN_TYPE> ops) {
+    ParserFunction<ExprASTNode, std::optional<std::unique_ptr<ExprASTNode>>> self;
+    
+    self = [next, ops, &self](std::optional<std::unique_ptr<ExprASTNode>> p) -> ResultMonad<ExprASTNode> {
+      std::unique_ptr<ExprASTNode> lhs;
+
+      if(p.has_value()) { 
+        lhs = std::move(p.value());
+        ConsumeVal(TOKEN_TYPE, op, token_type);
+        TOKEN opTok = CurTok;
+        ConsumeNoCall(ExprASTNode, rhs, next(std::nullopt));
+
+        // We have two expressions, create the new node & propagate onwards
+        lhs = unique_ptr_cast<ExprASTNode>(BinaryASTNode(CurTok, op, std::move(lhs), std::move(rhs)));
+      } else { // Evaluate lower level expression
+        ResultMonad<ExprASTNode> res = next(std::nullopt);
+        if(res.success()) { lhs = std::move(res).unwrap(); } else { return res; }
+      }
+
+      if(std::find(ops.begin(), ops.end(), CurTok.type) != ops.end()) {        
+        ConsumeNoCall(ExprASTNode, rhs, self(std::optional<std::unique_ptr<ExprASTNode>>(std::move(lhs))));
+
+        return std::move(rhs);
+      }
+
+    return make_result_ptr(std::move(lhs));
+  };
+
+  return self;
+};
+
 static ParserFunction<ExprASTNode> unary_expr = 
   []() -> ResultMonad<ExprASTNode> {
     if(CurTok.type == TOKEN_TYPE::MINUS || CurTok.type == TOKEN_TYPE::NOT) {
@@ -277,90 +319,24 @@ static ParserFunction<ExprASTNode> unary_expr =
     return parentheses_expr();
   };
 
-static ParserFunction<ExprASTNode> mul_expr = 
-  []() -> ResultMonad<ExprASTNode> {
-    Consume(ExprASTNode, lhs, unary_expr);
+inline auto unary_wrapper = [](std::optional<std::unique_ptr<ExprASTNode>> _p) -> ResultMonad<ExprASTNode> {
+  return unary_expr();
+};
 
-    if(CurTok.type == TOKEN_TYPE::ASTERIX || CurTok.type == TOKEN_TYPE::DIV || CurTok.type == TOKEN_TYPE::MOD) {
-      ConsumeVal(TOKEN_TYPE, op, token_type);
-      Consume(ExprASTNode, rhs, mul_expr);
+static auto mul_expr = generic_binary_expr(unary_wrapper, {TOKEN_TYPE::ASTERIX, TOKEN_TYPE::DIV, TOKEN_TYPE::MOD});
 
-      return make_result_ptr(unique_ptr_cast<ExprASTNode>(BinaryASTNode(CurTok, op, std::move(lhs), std::move(rhs))));
-    }
+static auto add_expr = generic_binary_expr(mul_expr, {TOKEN_TYPE::PLUS, TOKEN_TYPE::MINUS});
 
-    return lhs;
-  };
+static auto rel_expr = generic_binary_expr(add_expr, {TOKEN_TYPE::LT, TOKEN_TYPE::LE, TOKEN_TYPE::GT, TOKEN_TYPE::GE});
 
-static ParserFunction<ExprASTNode> add_expr = 
-  []() -> ResultMonad<ExprASTNode> {
-    Consume(ExprASTNode, lhs, mul_expr);
+static auto eq_expr = generic_binary_expr(rel_expr, {TOKEN_TYPE::EQ, TOKEN_TYPE::NE});
 
-    if(CurTok.type == TOKEN_TYPE::PLUS || CurTok.type == TOKEN_TYPE::MINUS) {
-      ConsumeVal(TOKEN_TYPE, op, token_type);
-      Consume(ExprASTNode, rhs, add_expr);
-  
-      return make_result_ptr(unique_ptr_cast<ExprASTNode>(BinaryASTNode(CurTok, op, std::move(lhs), std::move(rhs))));
-    }
+static auto and_expr = generic_binary_expr(eq_expr, {TOKEN_TYPE::AND});
 
-    return lhs;
-  };
-
-
-static ParserFunction<ExprASTNode> rel_expr = 
-  []() -> ResultMonad<ExprASTNode> {
-    Consume(ExprASTNode, lhs, add_expr);
-
-    if(CurTok.type == TOKEN_TYPE::LT || CurTok.type == TOKEN_TYPE::LE || CurTok.type == TOKEN_TYPE::GT || CurTok.type == TOKEN_TYPE::GE) {
-      ConsumeVal(TOKEN_TYPE, op, token_type);
-      Consume(ExprASTNode, rhs, rel_expr);
-
-      return make_result_ptr(unique_ptr_cast<ExprASTNode>(BinaryASTNode(CurTok, op, std::move(lhs), std::move(rhs))));
-    }
-
-    return lhs;
-  };
-
-static ParserFunction<ExprASTNode> eq_expr = 
-  []() -> ResultMonad<ExprASTNode> {
-    Consume(ExprASTNode, lhs, rel_expr);
-
-    if(CurTok.type == TOKEN_TYPE::EQ || CurTok.type == TOKEN_TYPE::NE) {
-      Consume(TOKEN_TYPE, op, token_type);
-      Consume(ExprASTNode, rhs, eq_expr);
-
-      return make_result_ptr(unique_ptr_cast<ExprASTNode>(BinaryASTNode(CurTok, *op.release(), std::move(lhs), std::move(rhs))));
-    }
-
-    return lhs;
-  };
-
-static ParserFunction<ExprASTNode> and_expr = 
-  []() -> ResultMonad<ExprASTNode> {
-    Consume(ExprASTNode, lhs, eq_expr);
-
-    if(CurTok.type == TOKEN_TYPE::AND) {
-      getNextToken();
-      Consume(ExprASTNode, rhs, and_expr);
-
-      return make_result_ptr(unique_ptr_cast<ExprASTNode>(BinaryASTNode(CurTok, TOKEN_TYPE::AND, std::move(lhs), std::move(rhs))));
-    }
-
-    return lhs;
-  };
-
-inline static ResultMonad<ExprASTNode> or_expr()
-  {
-    Consume(ExprASTNode, lhs, and_expr);
-
-    if(CurTok.type == TOKEN_TYPE::OR) {
-      getNextToken();
-      Consume(ExprASTNode, rhs, or_expr);
-
-      return make_result_ptr(unique_ptr_cast<ExprASTNode>(BinaryASTNode(CurTok, TOKEN_TYPE::OR, std::move(lhs), std::move(rhs))));
-    }
-
-    return lhs;
-  }
+inline static ResultMonad<ExprASTNode> or_expr(std::optional<std::unique_ptr<ExprASTNode>> p) {
+  auto func = generic_binary_expr(and_expr, {TOKEN_TYPE::OR});
+  return func(std::move(p));
+}
 
 #pragma endregion
 
