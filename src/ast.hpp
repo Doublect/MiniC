@@ -51,9 +51,9 @@ class ProgramASTNode;
 #pragma region AST
 
 template <typename T>
-static std::vector<std::unique_ptr<ASTPrint>> map_printer(std::vector<std::unique_ptr<T>> &nodes)
+static std::vector<std::shared_ptr<ASTPrint>> map_printer(std::vector<std::unique_ptr<T>> &nodes)
 {
-  std::vector<std::unique_ptr<ASTPrint>> asts;
+  std::vector<std::shared_ptr<ASTPrint>> asts;
   for (auto &node : nodes)
   {
     asts.push_back(std::move(node->to_ast_print()));
@@ -69,9 +69,9 @@ public:
   virtual Value *codegen() = 0;
   virtual std::string to_string() const { return "ASTNode"; };
 
-  virtual std::unique_ptr<ASTPrint> to_ast_print()
+  virtual std::shared_ptr<ASTPrint> to_ast_print()
   {
-    return make_ast_print("", "", std::vector<std::unique_ptr<ASTPrint>>());
+    return make_ast_print("", "", std::vector<std::shared_ptr<ASTPrint>>());
   }
 
   void print_string(std::string indent, std::string str, bool last = false)
@@ -84,7 +84,7 @@ class StatementASTNode : public ASTNode
 {
 public:
   StatementASTNode() {}
-  Value *codegen() override { return nullptr; };
+  Value *codegen();
 };
 
 class ExprASTNode : public StatementASTNode
@@ -108,12 +108,12 @@ public:
     Type = TypeSpecType::INT;
   }
   Value *codegen() override;
-  std::unique_ptr<ASTPrint> to_ast_print() override
+  std::shared_ptr<ASTPrint> to_ast_print() override
   {
     return make_ast_print(
         "IntASTNode",
         std::to_string(Val),
-        std::vector<std::unique_ptr<ASTPrint>>());
+        std::vector<std::shared_ptr<ASTPrint>>());
   };
   // virtual std::string to_string() const override {
   // return a sting representation of this AST node
@@ -132,12 +132,12 @@ public:
     Type = TypeSpecType::FLOAT;
   }
   Value *codegen() override;
-  std::unique_ptr<ASTPrint> to_ast_print() override
+  std::shared_ptr<ASTPrint> to_ast_print() override
   {
     return make_ast_print(
         "FloatASTNode",
         std::to_string(Val),
-        std::vector<std::unique_ptr<ASTPrint>>());
+        std::vector<std::shared_ptr<ASTPrint>>());
   };
 };
 
@@ -153,12 +153,12 @@ public:
     Type = TypeSpecType::BOOL;
   }
   Value *codegen() override;
-  std::unique_ptr<ASTPrint> to_ast_print() override
+  std::shared_ptr<ASTPrint> to_ast_print() override
   {
     return make_ast_print(
         "BoolASTNode",
         std::to_string(Val),
-        std::vector<std::unique_ptr<ASTPrint>>());
+        std::vector<std::shared_ptr<ASTPrint>>());
   };
 };
 
@@ -178,15 +178,12 @@ public:
       : Op(op), Operand(std::move(operand)), Tok(tok) { Type = Operand->getType(); }
   Value *codegen() override;
 
-  std::unique_ptr<ASTPrint> to_ast_print() override
+  std::shared_ptr<ASTPrint> to_ast_print() override
   {
-    auto children = std::vector<std::unique_ptr<ASTPrint>>();
-
-    children.push_back(Operand->to_ast_print());
     return make_ast_print( 
         "UnaryASTNode",
         "Op: " + Tok.lexeme,
-        std::move(children)
+        {Operand->to_ast_print()}
     );
   };
 };
@@ -206,17 +203,13 @@ public:
       : Op(op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
   Value *codegen() override;
 
-  std::unique_ptr<ASTPrint> to_ast_print() override
+  std::shared_ptr<ASTPrint> to_ast_print() override
   {
-    auto children = std::vector<std::unique_ptr<ASTPrint>>();
-
-    children.push_back(LHS->to_ast_print());
-    children.push_back(RHS->to_ast_print());
-
     return make_ast_print(
         "BinaryASTNode",
         "Op: " + Tok.lexeme,
-        std::move(children));
+        {LHS->to_ast_print(), RHS->to_ast_print()}
+    );        
   };
 };
 
@@ -229,12 +222,12 @@ class VariableRefASTNode : public ExprASTNode
 public:
   VariableRefASTNode(TOKEN tok, const std::string &Name) : Name(Name) {}
   Value *codegen() override;
-  std::unique_ptr<ASTPrint> to_ast_print() override
+  std::shared_ptr<ASTPrint> to_ast_print() override
   {
     return make_ast_print(
         "VariableRefASTNode",
         std::string(Name),
-        std::vector<std::unique_ptr<ASTPrint>>()
+        std::vector<std::shared_ptr<ASTPrint>>()
       );
   };
 };
@@ -253,16 +246,12 @@ public:
       : tok(tok), FunctionName(funcName), Args(std::move(Args)) {}
   Value *codegen() override;
 
-  std::unique_ptr<ASTPrint> to_ast_print() override
+  std::shared_ptr<ASTPrint> to_ast_print() override
   {
-    auto children = std::vector<std::unique_ptr<ASTPrint>>();
-
-    children.push_back(make_ast_print("Args:", "", map_printer(Args)));
-
     return make_ast_print(
         "CallExprAST",
         "FunctionName: " + FunctionName,
-        std::move(children)
+        {make_ast_print("Args:", "", map_printer(Args))}
       );
   };
 };
@@ -278,16 +267,12 @@ public:
                     std::unique_ptr<ExprASTNode> RHS)
       : Name(Name), RHS(std::move(RHS)) {}
   Value *codegen() override;
-  std::unique_ptr<ASTPrint> to_ast_print() override
+  std::shared_ptr<ASTPrint> to_ast_print() override
   {
-    auto children = std::vector<std::unique_ptr<ASTPrint>>();
-
-    children.push_back(RHS->to_ast_print());
-
     return make_ast_print(
         "AssignmentASTNode",
         "Name: " + Name,
-        std::move(children)
+        {RHS->to_ast_print()}
     );
   };
 };
@@ -296,27 +281,6 @@ public:
 /// Statements
 ///----------------------------------------------------------------------------
 #pragma region Statements
-// class ExprStatementASTNode : public StatementASTNode
-// {
-//   std::unique_ptr<ExprASTNode> Expr;
-
-// public:
-//   ExprStatementASTNode(std::unique_ptr<ExprASTNode> expr) : Expr(std::move(expr)) {}
-//   virtual Value *codegen() { return nullptr; };
-
-//   virtual std::unique_ptr<ASTPrint> to_ast_print() override
-//   {
-//     auto children = std::vector<std::unique_ptr<ASTPrint>>();
-
-//     children.push_back(Expr->to_ast_print());
-
-//     return make_ast_print(
-//         "ExprStatementASTNode",
-//         "",
-//         std::move(children)
-//     );
-//   }
-// };
 
 class VariableDeclASTNode;
 
@@ -330,17 +294,15 @@ public:
     std::vector<std::unique_ptr<StatementASTNode>> &&statements) 
     : Declarations(std::move(declarations)), Statements(std::move(statements)) {}
   Value *codegen() override;
-  std::unique_ptr<ASTPrint> to_ast_print() override
+  std::shared_ptr<ASTPrint> to_ast_print() override
   {
-    auto children = std::vector<std::unique_ptr<ASTPrint>>();
-
-    children.push_back(make_ast_children("Declarations:", map_printer(Declarations)));
-    children.push_back(make_ast_children("Statements:", map_printer(Statements)));
-
     return make_ast_print(
         "BlockASTNode",
         "",
-        std::move(children)
+        {
+          make_ast_children("Declarations:", map_printer(Declarations)),
+          make_ast_children("Statements:", map_printer(Statements))
+        }
       );
   }
 };
@@ -356,23 +318,20 @@ public:
                 std::unique_ptr<BlockASTNode> Else)
       : Cond(std::move(Cond)), Then(std::move(Then)), Else(std::move(Else)) {}
   Value *codegen() override;
-  std::unique_ptr<ASTPrint> to_ast_print() override
+  std::shared_ptr<ASTPrint> to_ast_print() override
   {
-    auto children = std::vector<std::unique_ptr<ASTPrint>>();
+    std::vector<std::shared_ptr<ASTPrint>> children {
+      make_ast_labelled("Cond:", Cond->to_ast_print()),
+      make_ast_labelled("Then:", Then->to_ast_print())
+    };
+    //TODO: recheck brevity
 
-    children.push_back(make_ast_labelled("Cond:", Cond->to_ast_print()));
-    children.push_back(make_ast_labelled("Then:", Then->to_ast_print()));
     if(Else)
       children.push_back(make_ast_labelled("Else:", Else->to_ast_print()));
 
     return make_ast_print(
         "IfElseASTNode",
         "",
-        // std::vector<std::unique_ptr<ASTPrint>>{
-        //   make_ast_labelled("Cond:", Cond->to_ast_print()),
-        //   make_ast_labelled("Then:", Then->to_ast_print()), 
-        //   make_ast_labelled("Else:", Else->to_ast_print())
-        // }
         std::move(children)
       );
   }
@@ -388,18 +347,16 @@ public:
       : Cond(std::move(Cond)), Body(std::move(Body)) {}
   Value *codegen() override;
 
-  std::unique_ptr<ASTPrint> to_ast_print() override
+  std::shared_ptr<ASTPrint> to_ast_print() override
   {
-    auto children = std::vector<std::unique_ptr<ASTPrint>>();
-
-    children.push_back(make_ast_labelled("Cond:", Cond->to_ast_print()));
-    children.push_back(make_ast_labelled("Body:", Body->to_ast_print()));
-
     return make_ast_print(
         "WhileASTNode",
         "",
-        std::move(children)
-        );
+        {
+          make_ast_labelled("Cond:", Cond->to_ast_print()),
+          make_ast_labelled("Body:", Body->to_ast_print())
+        }
+      );
   }
 };
 
@@ -411,9 +368,9 @@ public:
   ReturnStmtASTNode(std::unique_ptr<ExprASTNode> expr) : Expr(std::move(expr)) {}
   Value *codegen() override;
 
-  std::unique_ptr<ASTPrint> to_ast_print() override
+  std::shared_ptr<ASTPrint> to_ast_print() override
   {
-    auto children = std::vector<std::unique_ptr<ASTPrint>>();
+    auto children = std::vector<std::shared_ptr<ASTPrint>>();
 
     if(Expr) {
       children.push_back(make_ast_labelled("Expr:", Expr->to_ast_print()));
@@ -433,13 +390,9 @@ class EmptyStatementASTNode : public StatementASTNode
 public:
   EmptyStatementASTNode() {}
   Value *codegen() override { return nullptr; };
-  std::unique_ptr<ASTPrint> to_ast_print() override
+  std::shared_ptr<ASTPrint> to_ast_print() override
   {
-    return make_ast_print(
-        "EmptyStatementASTNode",
-        "",
-        std::vector<std::unique_ptr<ASTPrint>>()
-        );
+    return make_ast_print("EmptyStatementASTNode");
   }
 };
 #pragma endregion
@@ -451,16 +404,7 @@ class DeclASTNode : public ASTNode
 {
 
 public:
-  DeclASTNode() {}
-  Value *codegen() override { return nullptr; };
-  std::unique_ptr<ASTPrint> to_ast_print() override
-  {
-    return make_ast_print(
-        "",
-        "",
-        std::vector<std::unique_ptr<ASTPrint>>()
-        );
-  }
+  DeclASTNode() = default;
 };
 
 class VariableDeclASTNode : public DeclASTNode
@@ -474,15 +418,12 @@ public:
   VariableDeclASTNode(TOKEN tok, const std::string &Name, VariableType type) : Name(std::move(Name)), Type(type) {}
   Value *codegen() override;
 
-  std::unique_ptr<ASTPrint> to_ast_print() override
+  std::shared_ptr<ASTPrint> to_ast_print() override
   {
-    auto children = std::vector<std::unique_ptr<ASTPrint>>();
-
-    children.push_back(make_ast_leaf("Type: " + std::to_string((int)Type)));
     return make_ast_print(
         "VariableDeclASTNode",
         "Name: " + Name,
-        std::move(children)
+        { make_ast_leaf("Type: " + std::to_string((int)Type)) }
         );
   }
   VariableType getType() { return Type; }
@@ -512,18 +453,16 @@ public:
       : Name(Name), Args(std::move(Args)), Body(std::move(Body)), ReturnType(returnType) {}
   Value *codegen() override;
 
-  std::unique_ptr<ASTPrint> to_ast_print() override
+  std::shared_ptr<ASTPrint> to_ast_print() override
   {
-    auto children = std::vector<std::unique_ptr<ASTPrint>>();
-
-    children.push_back(make_ast_children("Args:", map_printer(Args)));
-    children.push_back(make_ast_labelled("Body:", Body->to_ast_print()));
-    children.push_back(make_ast_leaf("ReturnType: " + std::to_string(ReturnType)));
-
     return make_ast_print(
         "FunctionDeclASTNode",
         "Name: " + Name,
-        std::move(children)
+        {
+          make_ast_children("Args:", map_printer(Args)),
+          make_ast_labelled("Body:", Body->to_ast_print()),
+          make_ast_leaf("ReturnType: " + std::to_string(ReturnType))
+        }
       );
   }
 };
@@ -541,17 +480,15 @@ public:
       : Name(Name), Args(std::move(Args)), ReturnType(returnType) {}
   Value *codegen() override;
 
-  std::unique_ptr<ASTPrint> to_ast_print() override
+  std::shared_ptr<ASTPrint> to_ast_print() override
   {
-    auto children = std::vector<std::unique_ptr<ASTPrint>>();
-
-    children.push_back(make_ast_children("Args:", map_printer(Args)));
-    children.push_back(make_ast_leaf("ReturnType: " + std::to_string(ReturnType)));
-
     return make_ast_print(
         "ExternFunctionDeclASTNode",
         "Name: " + Name,
-        std::move(children)
+        {
+          make_ast_children("Args:", map_printer(Args)),
+          make_ast_leaf("ReturnType: " + std::to_string(ReturnType))
+        }
       );
   }
 };
@@ -567,17 +504,15 @@ public:
       : ExternDeclarations(std::move(ExternDeclarations)), Declarations(std::move(Declarations)) {}
   Value *codegen() override;
 
-  std::unique_ptr<ASTPrint> to_ast_print() override
+  std::shared_ptr<ASTPrint> to_ast_print() override
   {
-    auto children = std::vector<std::unique_ptr<ASTPrint>>();
-
-    children.push_back(make_ast_children("ExternDeclarations:", map_printer(ExternDeclarations)));
-    children.push_back(make_ast_children("Declarations:", map_printer(Declarations)));
-
     return make_ast_print(
         "ProgramASTNode",
         "",
-        std::move(children)
+        {
+          make_ast_children("ExternDeclarations:", map_printer(ExternDeclarations)),
+          make_ast_children("Declarations:", map_printer(Declarations))
+        }
       );
   }
 };

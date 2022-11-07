@@ -10,14 +10,14 @@ class ASTPrint
 {
     std::string name;
     std::string var;
-    std::vector<std::unique_ptr<ASTPrint>> children;
+    std::vector<std::shared_ptr<ASTPrint>> children;
 
 public:
   ASTPrint() {};
   ASTPrint(
       std::string name,
       std::string var,
-      std::vector<std::unique_ptr<ASTPrint>> &&children) : name(name), var(var), children(std::move(children)) {}
+      std::vector<std::shared_ptr<ASTPrint>> &&children) : name(name), var(var), children(std::move(children)) {}
 
   virtual void printAST(std::string indent = "", bool last = false)
   {
@@ -40,12 +40,12 @@ public:
 class ASTPrintChildren : public ASTPrint
 {
   std::string name;
-  std::vector<std::unique_ptr<ASTPrint>> children;
+  std::vector<std::shared_ptr<ASTPrint>> children;
 
 public:
   ASTPrintChildren(
     std::string name,
-    std::vector<std::unique_ptr<ASTPrint>> &&children) : name(name), children(std::move(children)) {}
+    std::vector<std::shared_ptr<ASTPrint>> &&children) : name(name), children(std::move(children)) {}
 
   virtual void printAST(std::string indent, bool last = false)
   {
@@ -67,12 +67,12 @@ public:
 class ASTPrintLabelled : public ASTPrint
 {
   std::string name;
-  std::unique_ptr<ASTPrint> child;
+  std::shared_ptr<ASTPrint> child;
 
 public:
   ASTPrintLabelled(
     std::string name,
-    std::unique_ptr<ASTPrint> &&child) : name(name), child(std::move(child)) {}
+    std::shared_ptr<ASTPrint> &&child) : name(name), child(std::move(child)) {}
 
   virtual void printAST(std::string indent, bool last = false)
   {
@@ -99,9 +99,9 @@ public:
 };
 
 
-std::unique_ptr<ASTPrint> make_ast_print(std::string name, std::string var, std::vector<std::unique_ptr<ASTPrint>> &&children);
-std::unique_ptr<ASTPrint> make_ast_children(std::string name, std::vector<std::unique_ptr<ASTPrint>> &&children);
-std::unique_ptr<ASTPrint> make_ast_labelled(std::string name, std::unique_ptr<ASTPrint> &&child);
-std::unique_ptr<ASTPrint> make_ast_leaf(std::string name);
+std::shared_ptr<ASTPrint> make_ast_print(std::string name, std::string var = "", std::vector<std::shared_ptr<ASTPrint>> &&children = {});
+std::shared_ptr<ASTPrint> make_ast_children(std::string name, std::vector<std::shared_ptr<ASTPrint>> &&children = {});
+std::shared_ptr<ASTPrint> make_ast_labelled(std::string name, std::shared_ptr<ASTPrint> &&child = {});
+std::shared_ptr<ASTPrint> make_ast_leaf(std::string name);
 
 #endif // AST_PRINT_H
