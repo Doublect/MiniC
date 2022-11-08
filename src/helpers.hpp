@@ -53,10 +53,26 @@
 
         public:
             ResultMonad(ResultMonad<T> &&other) {
-                std::cout << "Move constructor" << std::endl;
+                //std::cout << "Move constructor 1" << std::endl;
                 val = std::move(other.val);
                 err = other.err;
                 success_val = other.success_val;
+            }
+
+            template<typename U> 
+                requires(std::is_convertible_v<U*, T*>)
+            ResultMonad(ResultMonad<U> &&other) {
+                //std::cout << "Move constructor 2" << std::endl;
+                err = other.error();
+                success_val = other.success();
+                val = std::move(other).unwrap();
+            }
+
+            template<typename U> 
+            ResultMonad(ResultMonad<U> &&other) {
+                std::cout << "Warning: Move constructor can only convert from a ResultMonad<T> to a ResultMonad<U> if T is convertible to U." << std::endl;
+                err = other.error();
+                success_val = false;
             }
             ResultMonad(std::unique_ptr<T> &&val) : val(std::move(val)), success_val(true) {}
             //ResultMonad(T val) : val(std::make_unique<T>(std::move(val))), success_val(true) {}
@@ -64,7 +80,7 @@
             ResultMonad(ErrorT err, bool b) : err(err) {}
 
             template <class U = T>
-                requires(std::conjunction_v<std::is_convertible<T, U>>)
+                requires(std::is_convertible_v<U*, T*>)
             constexpr ResultMonad& operator=(U&& v) {
                 if (success_val)
                     val = std::move<U>(v);
@@ -102,35 +118,36 @@
             }
 
             template<typename U>
-                requires(std::conjunction_v<std::is_convertible<T, U>>)
-            constexpr operator ResultMonad<U>() {
-                std::cout << "Converted A" << std::endl;
-                if(this->success_val) {
-                    ResultMonad<U> res(std::move(val));
-                    return std::move(res);
+                requires(std::is_convertible_v<U*, T*>)
+            ResultMonad<T> operator=(ResultMonad<U> &&other) {
+                if (other.success()) {
+                    val = std::move(other.unwrap());
+                    success_val = true;
                 } else {
-                    ResultMonad<U> res(err);
-                    return std::move(res);
+                    err = other.error();
+                    success_val = false;
                 }
+
+                return this;
             }
 
             template<typename U>
             constexpr operator ResultMonad<U>() {
+                std::cout << "Warning: Implicit conversion can only convert from a ResultMonad<T> to a ResultMonad<U> if T is convertible to U." << std::endl;
                 ResultMonad<U> res(err, false);
-                std::cout << "Converted B: " << typeid(T).name() << " " << typeid(U).name()  << std::endl;
                 return std::move(res);
             }
+
     };
 
-    // template<typename T>
-    // ResultMonad<T> make_result(T&& val) {
-    //     return ResultMonad<T>(std::make_unique<T>(std::move(val)));
-    // }
+    template<typename T>
+    ResultMonad<T> make_result(T&& val) {
+        return ResultMonad<T>(std::make_unique<T>(std::move(val)));
+    }
 
-    template<typename T, typename U>
-        requires(std::conjunction_v<std::is_convertible<T, U>>)
-    ResultMonad<T> make_result(U&& val) {
-        return ResultMonad<T>(std::make_unique(std::move(val)));
+    template<typename T>
+    ResultMonad<T> make_result(ErrorT&& err) {
+        return ResultMonad<T>(err);
     }
 
     template<typename T>
