@@ -21,9 +21,6 @@
     template <typename Base, typename Derived> std::unique_ptr<Base> unique_ptr_cast(Derived &&p) {
         return std::unique_ptr<Base>(std::make_unique<Derived>(std::move(p)));
     }
-    template <typename Base, typename Derived> constexpr std::shared_ptr<Base> shared_ptr_cast(Derived &&p) {
-        return std::shared_ptr<Base>(std::make_shared<Derived>(std::move(p)));
-    }
 
     class ErrorT {
         std::string message;
