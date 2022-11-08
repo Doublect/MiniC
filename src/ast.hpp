@@ -67,24 +67,17 @@ class ASTNode
 public:
   virtual ~ASTNode() = default;
   virtual Value *codegen() = 0;
-  virtual std::string to_string() const { return "ASTNode"; };
+  virtual std::string to_string() { return "ASTNode"; };
 
-  virtual std::shared_ptr<ASTPrint> to_ast_print()
-  {
-    return make_ast_print("", "", std::vector<std::shared_ptr<ASTPrint>>());
-  }
-
-  void print_string(std::string indent, std::string str, bool last = false)
-  {
-    std::cout << indent << (last ? "└─" : "├─") << str << std::endl;
-  }
+  virtual std::shared_ptr<ASTPrint> to_ast_print() = 0;
 };
 
 class StatementASTNode : public ASTNode
 {
 public:
-  StatementASTNode() {}
-  Value *codegen();
+  StatementASTNode() = default;
+  virtual Value *codegen() override = 0;
+  virtual std::shared_ptr<ASTPrint> to_ast_print() override = 0;
 };
 
 class ExprASTNode : public StatementASTNode
@@ -92,7 +85,10 @@ class ExprASTNode : public StatementASTNode
 protected:
   TypeSpecType Type;
 public:
-  Value *codegen() override { return nullptr; };
+  ExprASTNode() = default;
+  virtual Value *codegen() override = 0;
+  virtual std::shared_ptr<ASTPrint> to_ast_print() override = 0;
+
   virtual TypeSpecType getType() { return Type; };
 };
 
@@ -115,9 +111,6 @@ public:
         std::to_string(Val),
         std::vector<std::shared_ptr<ASTPrint>>());
   };
-  // virtual std::string to_string() const override {
-  // return a sting representation of this AST node
-  //};
 };
 
 /// AST representation of a float literal
@@ -220,7 +213,7 @@ class VariableRefASTNode : public ExprASTNode
   TOKEN Tok;
 
 public:
-  VariableRefASTNode(TOKEN tok, const std::string &Name) : Name(Name) {}
+  VariableRefASTNode(TOKEN tok, std::string &&Name) : Name(Name) {}
   Value *codegen() override;
   std::shared_ptr<ASTPrint> to_ast_print() override
   {
@@ -241,7 +234,7 @@ class CallExprAST : public ExprASTNode
   TOKEN tok;
 
 public:
-  CallExprAST(TOKEN tok, const std::string &funcName,
+  CallExprAST(TOKEN tok, std::string &&funcName,
               std::vector<std::unique_ptr<ExprASTNode>> Args)
       : tok(tok), FunctionName(funcName), Args(std::move(Args)) {}
   Value *codegen() override;
@@ -263,7 +256,7 @@ class AssignmentASTNode : public ExprASTNode
   TOKEN Tok;
 
 public:
-  AssignmentASTNode(TOKEN tok, const std::string &Name,
+  AssignmentASTNode(TOKEN tok, std::string &&Name,
                     std::unique_ptr<ExprASTNode> RHS)
       : Name(Name), RHS(std::move(RHS)) {}
   Value *codegen() override;
@@ -405,6 +398,9 @@ class DeclASTNode : public ASTNode
 
 public:
   DeclASTNode() = default;
+
+  virtual Value *codegen() override = 0;
+  virtual std::shared_ptr<ASTPrint> to_ast_print() override = 0;
 };
 
 class VariableDeclASTNode : public DeclASTNode
@@ -415,7 +411,7 @@ protected:
   VariableType Type;
 
 public:
-  VariableDeclASTNode(TOKEN tok, const std::string &Name, VariableType type) : Name(std::move(Name)), Type(type) {}
+  VariableDeclASTNode(TOKEN tok, std::string &Name, VariableType type) : Name(std::move(Name)), Type(type) {}
   Value *codegen() override;
 
   std::shared_ptr<ASTPrint> to_ast_print() override
