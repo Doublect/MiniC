@@ -75,21 +75,7 @@
                 success_val = false;
             }
             ResultMonad(std::unique_ptr<T> &&val) : val(std::move(val)), success_val(true) {}
-            //ResultMonad(T val) : val(std::make_unique<T>(std::move(val))), success_val(true) {}
             ResultMonad(ErrorT err) : err(err) {}
-            ResultMonad(ErrorT err, bool b) : err(err) {}
-
-            template <class U = T>
-                requires(std::is_convertible_v<U*, T*>)
-            constexpr ResultMonad& operator=(U&& v) {
-                if (success_val)
-                    val = std::move<U>(v);
-                else {
-                    err = std::move<U>(v);
-                }
-
-                return *this;
-            }
 
             constexpr const std::unique_ptr<T>&& unwrap() const&& {
                 return std::move(val);
@@ -130,14 +116,6 @@
 
                 return this;
             }
-
-            template<typename U>
-            constexpr operator ResultMonad<U>() {
-                std::cout << "Warning: Implicit conversion can only convert from a ResultMonad<T> to a ResultMonad<U> if T is convertible to U." << std::endl;
-                ResultMonad<U> res(err, false);
-                return std::move(res);
-            }
-
     };
 
     template<typename T>

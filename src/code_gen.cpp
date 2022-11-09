@@ -25,6 +25,7 @@
 #include<memory>
 #include<ostream>
 #include<stack>
+#include<set>
 
 #include "code_gen.hpp"
 
@@ -42,7 +43,8 @@ std::unique_ptr<Module> TheModule;
 std::unique_ptr<IRBuilder<>> Builder;
 
 class VariableScopeManager {
-    std::map<std::string, std::stack<Value *>> NamedValues;
+    std::map<std::string, GlobalVariable *> GlobalVariables;
+    std::map<std::string, std::stack<AllocaInst *>> NamedValues;
     std::stack<std::set<std::string>> ScopeStack;
 
 public:
@@ -67,21 +69,32 @@ public:
     }
 
     void addVariable(const std::string &Name, GlobalVariable *Global) {
-        NamedValues[Name].push(Global);
-        ScopeStack.top().insert(Name);
-    }
-
-    void allocateVariable(const std::string &Name, AllocaInst *Alloca) {
-        NamedValues[Name].pop();
-        NamedValues[Name].push(Alloca);
+        //TODO: redecl?
+        GlobalVariables[Name] = Global;
     }
 
     Value *getVariable(const std::string &Name) {
-        if (NamedValues.find(Name) == NamedValues.end()) {
-            // TODO: Error
-            return nullptr;
+        if (NamedValues.find(Name) != NamedValues.end()) {
+            return NamedValues[Name].top();
         }
-        return NamedValues[Name].top();
+
+        if(GlobalVariables.find(Name) != GlobalVariables.end()) {
+            return GlobalVariables[Name];
+        }
+        // TODO: Error
+        return nullptr;
+    }
+
+    Type *getType(const std::string &Name) {
+        if (NamedValues.find(Name) != NamedValues.end()) {
+            return NamedValues[Name].top()->getAllocatedType();
+        }
+
+        if(GlobalVariables.find(Name) != GlobalVariables.end()) {
+            return GlobalVariables[Name]->getValueType();
+        }
+        // TODO: Error
+        return nullptr;
     }
 };
 
@@ -130,7 +143,6 @@ static Type *GetType(TypeSpecType tst) {
 
 static AllocaInst *CreateAllocaArg(Function *TheFunction, const std::string &VarName, Type *Type) {
     IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
-
     std::cout << "Creating alloca for " << VarName << std::endl;
     return TmpB.CreateAlloca(
         Type, 
@@ -264,17 +276,11 @@ Value *VariableRefASTNode::codegen() {
     //std::cout << Builder->GetInsertBlock()->getModule() << std::endl;
     if(!V) {
         std::cout << "ERROR: Unknown variable name " << Name << std::endl;
-        return nullptr;
         // TODO errors
         //return LogErrorV("Undeclared variable name: " + Name);
     }
     // std::cout << "Found variable: " << Name << " Loading type: " << V->getAllocatedType()->getTypeID() << std::endl;
-    llvm::Type *type;
-    if(V->getType()->getTypeID() == Type::TypeID::PointerTyID) {
-        type = V->getType()->getPointerElementType();
-    } else {
-        type = V->getType();
-    }
+    llvm::Type *type = VariableScope.getType(Name);
 
     return Builder->CreateLoad(type, V, Name.c_str());
 }
