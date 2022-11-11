@@ -140,4 +140,15 @@
     class ResultMonad<T> {
 
     };
+
+    //#define DEBUG_MODE
+    #ifdef DEBUG_MODE
+        constexpr void print_a_debug(const std::string& msg) {
+            std::cout << msg << std::endl;
+        }
+    #else
+        constexpr void print_a_debug(const std::string& msg) {
+            // Do nothing
+        }
+    #endif
 #endif

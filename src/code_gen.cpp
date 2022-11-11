@@ -54,9 +54,13 @@ public:
 
     void pushScope() {
         ScopeStack.push(std::set<std::string>());
+
+        print_a_debug("Opening scope" + std::to_string(ScopeStack.size()));
     }
 
     void popScope() {
+        print_a_debug("Closing scope" + std::to_string(ScopeStack.size()));
+
         for (auto &Name : ScopeStack.top()) {
             NamedValues[Name].pop();
         }
@@ -74,11 +78,13 @@ public:
     }
 
     Value *getVariable(const std::string &Name) {
-        if (NamedValues.find(Name) != NamedValues.end()) {
+        print_a_debug("Searching for variable: " + Name);
+
+        if(NamedValues.contains(Name) && NamedValues[Name].size() > 0) {
             return NamedValues[Name].top();
         }
 
-        if(GlobalVariables.find(Name) != GlobalVariables.end()) {
+        if(GlobalVariables.contains(Name)) {
             return GlobalVariables[Name];
         }
         // TODO: Error
@@ -86,10 +92,7 @@ public:
     }
 
     Type *getType(const std::string &Name) {
-        std::cout << "Searching for: " << Name << std::endl;
-        std::cout << "Res: " << (NamedValues.contains(Name) && NamedValues[Name].size() > 0) << std::endl;
-
-        if (NamedValues.contains(Name) && NamedValues[Name].size() > 0) {
+        if(NamedValues.contains(Name) && NamedValues[Name].size() > 0) {
             return NamedValues[Name].top()->getAllocatedType();
         }
 
@@ -146,7 +149,9 @@ static Type *GetType(TypeSpecType tst) {
 
 static AllocaInst *CreateAllocaArg(Function *TheFunction, const std::string &VarName, Type *Type) {
     IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
-    std::cout << "Creating alloca for " << VarName << std::endl;
+
+    print_a_debug("Creating alloca for " + VarName);
+
     return TmpB.CreateAlloca(
         Type, 
         0, 
@@ -277,13 +282,14 @@ Value *VariableRefASTNode::codegen() {
     Value *V = VariableScope.getVariable(Name);
     //std::cout << "Found variable ref: " << Name << std::endl;
     //std::cout << Builder->GetInsertBlock()->getModule() << std::endl;
-    if(!V) {
+    llvm::Type *type = VariableScope.getType(Name);
+    
+    if(!V || !type) {
         std::cout << "ERROR: Unknown variable name " << Name << std::endl;
         // TODO errors
         //return LogErrorV("Undeclared variable name: " + Name);
     }
     // std::cout << "Found variable: " << Name << " Loading type: " << V->getAllocatedType()->getTypeID() << std::endl;
-    llvm::Type *type = VariableScope.getType(Name);
 
     return Builder->CreateLoad(type, V, Name.c_str());
 }
