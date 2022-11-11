@@ -86,11 +86,14 @@ public:
     }
 
     Type *getType(const std::string &Name) {
-        if (NamedValues.find(Name) != NamedValues.end()) {
+        std::cout << "Searching for: " << Name << std::endl;
+        std::cout << "Res: " << (NamedValues.contains(Name) && NamedValues[Name].size() > 0) << std::endl;
+
+        if (NamedValues.contains(Name) && NamedValues[Name].size() > 0) {
             return NamedValues[Name].top()->getAllocatedType();
         }
 
-        if(GlobalVariables.find(Name) != GlobalVariables.end()) {
+        if(GlobalVariables.contains(Name)) {
             return GlobalVariables[Name]->getValueType();
         }
         // TODO: Error
@@ -319,6 +322,7 @@ Value *AssignmentASTNode::codegen() {
 
 /// BlockASTNode does writes to the parent block, it does not create one by itself
 Value *BlockASTNode::codegen() {
+    VariableScope.pushScope();
 
     std::vector<Value *> declCode;
     for(auto &decl: this->Declarations) {
@@ -330,6 +334,7 @@ Value *BlockASTNode::codegen() {
         stmtCode.push_back(stmt->codegen());
     }
 
+    VariableScope.popScope();
     return Builder->GetInsertBlock();
 }
 

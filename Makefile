@@ -1,4 +1,5 @@
-CXX=clang++ -std=c++20 -g
+CXX=clang++ -std=c++20 -O3
+CompFLAGS= -g `llvm-config --cppflags`
 CFLAGS= -g `llvm-config --cppflags --ldflags --system-libs --libs all` \
 -Wno-unused-function -Wno-unknown-warning-option \
 -Wpessimizing-move -Wredundant-move -ferror-limit=5
@@ -11,7 +12,7 @@ mccomp: $(SRCF)/mccomp.cpp $(DEPS)
 
 $(BUILDF)/%.o: $(SRCF)/%.cpp $(SRCF)/%.hpp
 	@mkdir -p build
-	$(CXX) $< -c -o $@
+	$(CXX) $< $(CompFLAGS) -c -o $@
 
 clean:
 	rm -rf build

@@ -12,8 +12,7 @@ export LD_LIBRARY_PATH=$LLVM_INSTALL_PATH/lib:$LD_LIBRARY_PATH
 #CLANG=$LLVM_INSTALL_PATH/bin/clang++
 CLANG=clang++
 
-# TODO
-#module load GCC/9.2.0
+module load GCC/9.2.0
 
 DIR="$(pwd)"
 
@@ -118,5 +117,12 @@ rm -rf output.ll palindrome
 "$COMP" ./palindrome.c
 $CLANG driver.cpp output.ll -o palindrome
 validate "./palindrome"
+
+cd ../scope
+pwd
+rm -rf output.ll scope
+"$COMP" ./scope.c
+$CLANG driver.cpp output.ll -o scope
+validate "./scope"
 
 echo "***** ALL TESTS PASSED *****"
