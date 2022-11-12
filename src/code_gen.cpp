@@ -77,30 +77,18 @@ public:
         GlobalVariables[Name] = Global;
     }
 
-    Value *getVariable(const std::string &Name) {
+    std::tuple<Value *, Type *>getVariable(const std::string &Name) {
         print_a_debug("Searching for variable: " + Name);
 
         if(NamedValues.contains(Name) && NamedValues[Name].size() > 0) {
-            return NamedValues[Name].top();
+            return std::make_tuple(NamedValues[Name].top(), NamedValues[Name].top()->getAllocatedType());
         }
 
         if(GlobalVariables.contains(Name)) {
-            return GlobalVariables[Name];
+            return std::make_tuple(GlobalVariables[Name], GlobalVariables[Name]->getValueType());
         }
         // TODO: Error
-        return nullptr;
-    }
-
-    Type *getType(const std::string &Name) {
-        if(NamedValues.contains(Name) && NamedValues[Name].size() > 0) {
-            return NamedValues[Name].top()->getAllocatedType();
-        }
-
-        if(GlobalVariables.contains(Name)) {
-            return GlobalVariables[Name]->getValueType();
-        }
-        // TODO: Error
-        return nullptr;
+        throw std::runtime_error("Variable not found: " + Name);
     }
 };
 
@@ -279,26 +267,20 @@ Value *BinaryASTNode::codegen() {
 }
 
 Value *VariableRefASTNode::codegen() {
-    Value *V = VariableScope.getVariable(Name);
+    auto [V, Type] = VariableScope.getVariable(Name);
     //std::cout << "Found variable ref: " << Name << std::endl;
     //std::cout << Builder->GetInsertBlock()->getModule() << std::endl;
-    llvm::Type *type = VariableScope.getType(Name);
-    
-    if(!V || !type) {
-        std::cout << "ERROR: Unknown variable name " << Name << std::endl;
-        // TODO errors
-        //return LogErrorV("Undeclared variable name: " + Name);
-    }
+
     // std::cout << "Found variable: " << Name << " Loading type: " << V->getAllocatedType()->getTypeID() << std::endl;
 
-    return Builder->CreateLoad(type, V, Name.c_str());
+    return Builder->CreateLoad(Type, V, Name.c_str());
 }
 
 Value *CallExprAST::codegen() {
     Function *Function = TheModule->getFunction(FunctionName);
 
     //TODO: error, non-existent
-    //TODO: error, arg-size & types
+    //TODO: error, arg-size & types 
 
     std::vector<Value *> ArgsIR;
 
@@ -317,7 +299,7 @@ Value *AssignmentASTNode::codegen() {
         //return nullptr;
     }
 
-    Value *Alloca = VariableScope.getVariable(Name);
+    auto [Alloca, _] = VariableScope.getVariable(Name);
     Builder->CreateStore(Val, Alloca);
     return Val;
 }
@@ -337,6 +319,9 @@ Value *BlockASTNode::codegen() {
 
     std::vector<Value *> stmtCode;
     for(auto &stmt: this->Statements) {
+        // if(Builder->GetInsertBlock()->getTerminator()) {
+        //     break;
+        // }
         stmtCode.push_back(stmt->codegen());
     }
 
@@ -365,16 +350,18 @@ Value *IfElseASTNode::codegen() {
     BasicBlock *AfterBB = BasicBlock::Create(*TheContext, "after");
 
     // Jump to respective block, depending on condition
-    Builder->CreateCondBr(CondV, ThenBB, ElseBB);
+    if(!Builder->GetInsertBlock()->getTerminator()) {
+        Builder->CreateCondBr(CondV, ThenBB, ElseBB);
+    }
 
     // Then value
     Builder->SetInsertPoint(ThenBB);
 
-    // Create scope for both then and else (as only one of the get executed)
-    VariableScope.pushScope();
-
     Value *ThenV = Then->codegen();
-    Builder->CreateBr(AfterBB);
+
+    if(!Builder->GetInsertBlock()->getTerminator()) {
+        Builder->CreateBr(AfterBB);
+    }
 
     if(!ThenV)
         return nullptr;
@@ -385,17 +372,15 @@ Value *IfElseASTNode::codegen() {
 
     if(Else) {
         Value *ElseV = Else->codegen();
-
+        
+        //TODO: do I really need this?
         if(!ElseV)
             return nullptr;
     }
-    
-    Builder->CreateBr(AfterBB);
 
-    // Pop variable scope
-    VariableScope.popScope();
-
-    Builder->CreateBr(AfterBB);
+    if(!Builder->GetInsertBlock()->getTerminator()) {
+        Builder->CreateBr(AfterBB);
+    }
     TheFunction->getBasicBlockList().push_back(AfterBB);
 
     Builder->SetInsertPoint(AfterBB);
@@ -441,7 +426,9 @@ Value *WhileASTNode::codegen() {
         return nullptr;
     }
     // End of While body, reevaluate condition
-    Builder->CreateBr(CondBB);
+    if(!Builder->GetInsertBlock()->getTerminator()) {
+        Builder->CreateBr(CondBB);
+    }
 
     // After
     TheFunction->getBasicBlockList().push_back(AfterBB);
@@ -456,6 +443,8 @@ Value *ReturnStmtASTNode::codegen() {
     Value *RetVal = Expr ? Expr->codegen() : nullptr;
 
     Builder->CreateRet(RetVal);
+    BasicBlock *AfterBB = BasicBlock::Create(*TheContext, "afterreturn", Builder->GetInsertBlock()->getParent());
+    Builder->SetInsertPoint(AfterBB);
 
     return RetVal;
 }
@@ -519,10 +508,25 @@ Value *FunctionDeclASTNode::codegen() {
     // Do the body's code generation
     Body->codegen();
 
-
+    // Add default return value, respecting the return type
+    if(!Builder->GetInsertBlock()->getTerminator()) {
+        switch(F->getReturnType()->getTypeID()) {
+            case Type::TypeID::FloatTyID:
+                Builder->CreateRet(ConstantFP::get(*TheContext, APFloat(0.0f)));
+                break;
+            case Type::TypeID::IntegerTyID:
+                Builder->CreateRet(ConstantInt::get(*TheContext, APInt(32, 0, true)));
+                break;
+            default:
+                Builder->CreateRetVoid();
+                break;
+        }
+    }
+    //Builder->CreateReerrst(ConstantInt::get(*TheContext, APInt(32, 0, true)));
     VariableScope.popScope();
     // Ensure the function is valid
-    if(verifyFunction(*F)) {
+    if(verifyFunction(*F, &llvm::outs())) {
+        throw "HELLO";
         return F;
     } else {
         //TODO: error
