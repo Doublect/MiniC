@@ -11,6 +11,7 @@
     #include<ostream>
     #include<stack>
     #include<set>
+    #include<tuple>
 
     #include "helpers.hpp"
 
@@ -95,7 +96,26 @@
 
             V = ensureInteger(V);
             return Builder->CreateSIToFP(V, Type::getFloatTy(*TheContext), "floattmp");
-        }  
+        }
+
+        Value *ensureType(Value *V, Type::TypeID type) {
+            if (V->getType()->getTypeID() == type) {
+                return V;
+            }
+
+            if (type == Type::IntegerTyID) {
+                return ensureInteger(V);
+            }
+
+            return ensureFloat(V);
+        }
+
+        std::tuple<Value *, Value *, Type::TypeID> ensureSharedType(Value *L, Value *R) {
+            // bool == int < float
+            Type::TypeID typeID = std::min(L->getType()->getTypeID(), R->getType()->getTypeID());
+            
+            return std::make_tuple(ensureType(L, typeID), ensureType(R, typeID), typeID); 
+        }
     };
 
     class SemanticProblem {

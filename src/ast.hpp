@@ -96,8 +96,8 @@ public:
 class IntASTNode : public ExprASTNode
 {
   int Val;
-  TOKEN Tok;
   std::string Name;
+  TOKEN Tok;
 
 public:
   IntASTNode(TOKEN tok, int val) : Val(val), Tok(tok) {
@@ -117,8 +117,8 @@ public:
 class FloatASTNode : public ExprASTNode
 {
   float Val;
-  TOKEN Tok;
   std::string Name;
+  TOKEN Tok;
 
 public:
   FloatASTNode(TOKEN tok, float val) : Val(val), Tok(tok) {
@@ -138,8 +138,8 @@ public:
 class BoolASTNode : public ExprASTNode
 {
   bool Val;
-  TOKEN Tok;
   std::string Name;
+  TOKEN Tok;
 
 public:
   BoolASTNode(TOKEN tok, bool val) : Val(val), Tok(tok) {
@@ -167,7 +167,7 @@ class UnaryASTNode : public ExprASTNode
   TOKEN Tok;
 
 public:
-  UnaryASTNode(TOKEN tok, TOKEN_TYPE op, std::unique_ptr<ExprASTNode> operand)
+  UnaryASTNode(TOKEN_TYPE op, std::unique_ptr<ExprASTNode> operand, TOKEN tok)
       : Op(op), Operand(std::move(operand)), Tok(tok) { Type = Operand->getType(); }
   Value *codegen() override;
 
@@ -191,9 +191,9 @@ class BinaryASTNode : public ExprASTNode
   std::string Name;
 
 public:
-  BinaryASTNode(TOKEN tok, TOKEN_TYPE op, std::unique_ptr<ExprASTNode> LHS,
-                std::unique_ptr<ExprASTNode> RHS)
-      : Op(op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
+  BinaryASTNode(TOKEN_TYPE op, std::unique_ptr<ExprASTNode> LHS,
+                std::unique_ptr<ExprASTNode> RHS, TOKEN tok)
+      : Op(op), LHS(std::move(LHS)), RHS(std::move(RHS)), Tok(tok) {}
   Value *codegen() override;
 
   std::shared_ptr<ASTPrint> to_ast_print() override
@@ -281,11 +281,12 @@ class BlockASTNode : public StatementASTNode
 {
   std::vector<std::unique_ptr<DeclASTNode>> Declarations;
   std::vector<std::unique_ptr<StatementASTNode>> Statements;
+  TOKEN Tok;
 
 public:
   BlockASTNode(std::vector<std::unique_ptr<DeclASTNode>> &&declarations,
-    std::vector<std::unique_ptr<StatementASTNode>> &&statements) 
-    : Declarations(std::move(declarations)), Statements(std::move(statements)) {}
+    std::vector<std::unique_ptr<StatementASTNode>> &&statements, TOKEN tok) 
+    : Declarations(std::move(declarations)), Statements(std::move(statements)), Tok(tok) {}
   Value *codegen() override;
   std::shared_ptr<ASTPrint> to_ast_print() override
   {
@@ -305,11 +306,12 @@ class IfElseASTNode : public StatementASTNode
   std::unique_ptr<ExprASTNode> Cond;
   std::unique_ptr<BlockASTNode> Then;
   std::unique_ptr<BlockASTNode> Else;
+  TOKEN Tok;
 
 public:
   IfElseASTNode(std::unique_ptr<ExprASTNode> Cond, std::unique_ptr<BlockASTNode> Then,
-                std::unique_ptr<BlockASTNode> Else)
-      : Cond(std::move(Cond)), Then(std::move(Then)), Else(std::move(Else)) {}
+                std::unique_ptr<BlockASTNode> Else, TOKEN tok)
+      : Cond(std::move(Cond)), Then(std::move(Then)), Else(std::move(Else)), Tok(tok) {}
   Value *codegen() override;
   std::shared_ptr<ASTPrint> to_ast_print() override
   {
@@ -334,10 +336,11 @@ class WhileASTNode : public StatementASTNode
 {
   std::unique_ptr<ExprASTNode> Cond;
   std::unique_ptr<StatementASTNode> Body;
+  TOKEN Tok;
 
 public:
-  WhileASTNode(std::unique_ptr<ExprASTNode> Cond, std::unique_ptr<StatementASTNode> Body)
-      : Cond(std::move(Cond)), Body(std::move(Body)) {}
+  WhileASTNode(std::unique_ptr<ExprASTNode> Cond, std::unique_ptr<StatementASTNode> Body, TOKEN tok)
+      : Cond(std::move(Cond)), Body(std::move(Body)), Tok(tok) {}
   Value *codegen() override;
 
   std::shared_ptr<ASTPrint> to_ast_print() override
@@ -356,9 +359,10 @@ public:
 class ReturnStmtASTNode : public StatementASTNode
 {
   std::unique_ptr<ExprASTNode> Expr;
+  TOKEN Tok;
 
 public:
-  ReturnStmtASTNode(std::unique_ptr<ExprASTNode> expr) : Expr(std::move(expr)) {}
+  ReturnStmtASTNode(std::unique_ptr<ExprASTNode> expr, TOKEN tok) : Expr(std::move(expr)), Tok(tok) {}
   Value *codegen() override;
 
   std::shared_ptr<ASTPrint> to_ast_print() override
@@ -374,18 +378,6 @@ public:
         "",
         std::move(children)
       );
-  }
-};
-
-class EmptyStatementASTNode : public StatementASTNode
-{
-
-public:
-  EmptyStatementASTNode() {}
-  Value *codegen() override { return nullptr; };
-  std::shared_ptr<ASTPrint> to_ast_print() override
-  {
-    return make_ast_print("EmptyStatementASTNode");
   }
 };
 #pragma endregion
@@ -407,11 +399,11 @@ class VariableDeclASTNode : public DeclASTNode
 {
 protected:
   std::string Name;
-  TOKEN Tok;
   VariableType Type;
+  TOKEN Tok;
 
 public:
-  VariableDeclASTNode(TOKEN tok, std::string &Name, VariableType type) : Name(std::move(Name)), Type(type) {}
+  VariableDeclASTNode(TOKEN tok, std::string &Name, VariableType type) : Name(std::move(Name)), Type(type), Tok(tok) {}
   Value *codegen() override;
 
   std::shared_ptr<ASTPrint> to_ast_print() override
@@ -441,12 +433,13 @@ class FunctionDeclASTNode : public DeclASTNode
   std::vector<std::unique_ptr<FunctionParameterASTNode>> Args;
   std::unique_ptr<BlockASTNode> Body;
   TypeSpecType ReturnType;
+  TOKEN Tok;
 
 public:
   FunctionDeclASTNode(std::string Name,
                       std::vector<std::unique_ptr<FunctionParameterASTNode>> Args,
-                      std::unique_ptr<BlockASTNode> Body, TypeSpecType returnType)
-      : Name(Name), Args(std::move(Args)), Body(std::move(Body)), ReturnType(returnType) {}
+                      std::unique_ptr<BlockASTNode> Body, TypeSpecType returnType, TOKEN tok)
+      : Name(Name), Args(std::move(Args)), Body(std::move(Body)), ReturnType(returnType), Tok(tok) {}
   Value *codegen() override;
 
   std::shared_ptr<ASTPrint> to_ast_print() override
@@ -468,12 +461,13 @@ class ExternFunctionDeclASTNode : public DeclASTNode
   std::string Name;
   std::vector<std::unique_ptr<FunctionParameterASTNode>> Args;
   TypeSpecType ReturnType;
+  TOKEN Tok;
 
 public:
   ExternFunctionDeclASTNode(std::string Name,
                             std::vector<std::unique_ptr<FunctionParameterASTNode>> Args,
-                            TypeSpecType returnType)
-      : Name(Name), Args(std::move(Args)), ReturnType(returnType) {}
+                            TypeSpecType returnType, TOKEN tok)
+      : Name(Name), Args(std::move(Args)), ReturnType(returnType), Tok(tok) {}
   Value *codegen() override;
 
   std::shared_ptr<ASTPrint> to_ast_print() override

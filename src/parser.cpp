@@ -279,7 +279,7 @@ auto generic_binary_expr(ParserFunction<ExprASTNode, std::optional<std::unique_p
         ConsumeNoCall(ExprASTNode, rhs, next(std::nullopt));
 
         // We have two expressions, create the new node & propagate onwards
-        lhs = unique_ptr_cast<ExprASTNode>(BinaryASTNode(CurTok, op, std::move(lhs), std::move(rhs)));
+        lhs = unique_ptr_cast<ExprASTNode>(BinaryASTNode(op, std::move(lhs), std::move(rhs), CurTok));
       } else { // Evaluate lower level expression
         ResultMonad<ExprASTNode> res = next(std::nullopt);
         if(res.success()) { lhs = std::move(res).unwrap(); } else { return res; }
@@ -303,7 +303,7 @@ static ParserFunction<ExprASTNode> unary_expr =
       ConsumeVal(TOKEN_TYPE, op, token_type);
       Consume(ExprASTNode, unary, unary_expr);
       
-      return make_result(UnaryASTNode(CurTok, op, std::move(unary)));
+      return make_result(UnaryASTNode(op, std::move(unary), CurTok));
     }
 
     return parentheses_expr();
@@ -370,6 +370,7 @@ static ParserFunction<std::vector<std::unique_ptr<DeclASTNode>>> local_decl_list
 
 static ParserFunction<BlockASTNode> block = 
   []() -> ResultMonad<BlockASTNode> {
+    TOKEN startTok = CurTok;
     Expect(TOKEN_TYPE::LBRA);
 
     Consume(std::vector<std::unique_ptr<DeclASTNode>>, decls, local_decl_list);
@@ -378,11 +379,12 @@ static ParserFunction<BlockASTNode> block =
 
     Expect(TOKEN_TYPE::RBRA);
 
-    return make_result(BlockASTNode(std::move(*decls.release()), std::move(*statements.release())));
+    return make_result(BlockASTNode(std::move(*decls.release()), std::move(*statements.release()), startTok));
   };
 
 static ParserFunction<IfElseASTNode> if_stmt =
   []() -> ResultMonad<IfElseASTNode> {
+    TOKEN startTok = CurTok;
     std::unique_ptr<BlockASTNode> else_branch;
 
     Expect(TOKEN_TYPE::IF);
@@ -395,22 +397,24 @@ static ParserFunction<IfElseASTNode> if_stmt =
       ConsumeAssign(BlockASTNode, else_branch, block);
     }
 
-    return make_result(IfElseASTNode(std::move(condition), std::move(then_branch), std::move(else_branch)));
+    return make_result(IfElseASTNode(std::move(condition), std::move(then_branch), std::move(else_branch), startTok));
   };
 
 static ParserFunction<WhileASTNode> while_stmt =
   []() -> ResultMonad<WhileASTNode> {
+    TOKEN startTok = CurTok;
     Expect(TOKEN_TYPE::WHILE);
     Expect(TOKEN_TYPE::LPAR);
     Consume(ExprASTNode, condition, expr);
     Expect(TOKEN_TYPE::RPAR);
     Consume(StatementASTNode, body, stmt);
 
-    return make_result(WhileASTNode(std::move(condition), std::move(body)));
+    return make_result(WhileASTNode(std::move(condition), std::move(body), startTok));
   };
 
 static ResultMonad<ReturnStmtASTNode> return_stmt() {
     std::unique_ptr<ExprASTNode> exp;
+    TOKEN startTok = CurTok;
 
     Expect(TOKEN_TYPE::RETURN);
     if(CurTok.type != TOKEN_TYPE::SC) {
@@ -418,7 +422,7 @@ static ResultMonad<ReturnStmtASTNode> return_stmt() {
     }
     Expect(TOKEN_TYPE::SC);
 
-    return make_result(ReturnStmtASTNode(std::move(exp)));
+    return make_result(ReturnStmtASTNode(std::move(exp), startTok));
   };
 
 static ResultMonad<AssignmentASTNode> assign_stmt() {
@@ -483,7 +487,7 @@ static ParserFunction<std::vector<std::unique_ptr<FunctionParameterASTNode>>> fu
 
 static ParserFunction<ExternFunctionDeclASTNode> extern_decl = 
   []() -> ResultMonad<ExternFunctionDeclASTNode> {
-
+    TOKEN startTok = CurTok;
     Expect(TOKEN_TYPE::EXTERN);
     ConsumeVal(TypeSpecType, type, type_spec);
     ConsumeVal(std::string, name, ident);
@@ -492,7 +496,7 @@ static ParserFunction<ExternFunctionDeclASTNode> extern_decl =
     Expect(TOKEN_TYPE::RPAR);
     Expect(TOKEN_TYPE::SC); 
 
-    return make_result(ExternFunctionDeclASTNode(name, std::move(*params.release()), type));
+    return make_result(ExternFunctionDeclASTNode(name, std::move(*params.release()), type, startTok));
   };
 
 
@@ -510,8 +514,9 @@ static ResultMonad<std::vector<std::unique_ptr<ExternFunctionDeclASTNode>>> exte
 static ParserFunction<DeclASTNode> decl =
  []() -> ResultMonad<DeclASTNode> {
     std::string name;
-
     TypeSpecType type;
+    TOKEN startTok = CurTok;
+
     if(CurTok.type == TOKEN_TYPE::VOID_TOK) {
       type = TypeSpecType::VOID;
       getNextToken();
@@ -537,7 +542,7 @@ static ParserFunction<DeclASTNode> decl =
 
     Consume(BlockASTNode, node, block);
 
-    return make_result(FunctionDeclASTNode(name, std::move(*params.release()), std::move(node), type));
+    return make_result(FunctionDeclASTNode(name, std::move(*params.release()), std::move(node), type, startTok));
   };
 
 ResultMonad<std::vector<std::unique_ptr<DeclASTNode>>> decl_list() {

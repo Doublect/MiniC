@@ -108,8 +108,7 @@ std::function<Value*(TOKEN_TYPE Op, llvm::Value *L, const llvm::Twine &Name)> un
                     VariableCaster->ensureInteger(Builder->CreateFCmpOEQ(L, ConstantFP::get(*TheContext, APFloat(0.0)), Name)) : 
                     VariableCaster->ensureInteger(Builder->CreateICmpEQ(L, ConstantInt::get(*TheContext, APInt(32, 0, true)), Name)); 
             default:
-                return nullptr;
-                //TODO: Error
+                throw std::runtime_error("Invalid unary operator");
         }       
     };
 
@@ -118,8 +117,7 @@ Value *UnaryASTNode::codegen() {
     return unary_op_builder(Op, L, "unary");
 }
 
-auto operation_function =
-    [](Type::TypeID type, TOKEN_TYPE Op, llvm::Value *L, llvm::Value *R, const llvm::Twine &Name) -> Value* {
+inline Value *operation_function(Type::TypeID type, TOKEN_TYPE Op, llvm::Value *L, llvm::Value *R, const llvm::Twine &Name) {
         //std::function<Value *(llvm::Value *L, llvm::Value *R, const llvm::Twine &Name)> *func;
         std::vector<Value *> vals{L, R};
         
@@ -171,28 +169,15 @@ auto operation_function =
 Value *BinaryASTNode::codegen() {
     Value *L = LHS->codegen();
     Value *R = RHS->codegen();
-    
-    Type::TypeID typeID = std::min(L->getType()->getTypeID(), R->getType()->getTypeID());
+    print_a_debug(
+            "L: " + std::to_string((int)L->getType()->getTypeID()) 
+            + " R: " + std::to_string((int)R->getType()->getTypeID()) 
+        );
 
-    // std::cout << L->getType()->getTypeID() << " " << R->getType()->getTypeID() << std::endl;
+    auto [L_cast, R_cast, typeID] = VariableCaster->ensureSharedType(L, R);
 
-    if(typeID == Type::TypeID::IntegerTyID) {
-        L = VariableCaster->ensureInteger(L);
-        R = VariableCaster->ensureInteger(R);
-    }
-    if(typeID == Type::TypeID::FloatTyID) {
-        L = VariableCaster->ensureFloat(L);
-        R = VariableCaster->ensureFloat(R);
-    }
+    auto res = operation_function(typeID, Op, L_cast, R_cast, "binary_op");
 
-    auto res = operation_function(typeID, Op, L, R, "binary_op");
-
-    if(typeID == Type::TypeID::IntegerTyID) {
-        res = VariableCaster->ensureInteger(res);
-    } else {
-        res = VariableCaster->ensureFloat(res);
-    }
-    //TODO: emit warning
     return res;
 }
 
@@ -216,7 +201,10 @@ Value *CallExprAST::codegen() {
         ArgsIR.push_back(arg->codegen());
     }
 
-    return Builder->CreateCall(Function, ArgsIR, "call_tmp");
+    // A name can not be assigned to a function call which returns void
+    std::string name = Function->getReturnType()->isVoidTy() ? "" : "call_tmp";
+
+    return Builder->CreateCall(Function, ArgsIR, name);
 }
 
 Value *AssignmentASTNode::codegen() {
@@ -398,22 +386,26 @@ Value *VariableDeclASTNode::codegen() {
 }
 
 Value *FunctionDeclASTNode::codegen() {
-    //TODO: Types
     std::vector<Type *> ArgsTypes;
 
+    // Add all the argument types to the function
     for(auto &arg : Args) {
         ArgsTypes.push_back(GetType(arg->getType()));
     }
 
-    //TODO: types
+    // Create the function prototype
     FunctionType *FT = FunctionType::get(GetType(ReturnType), ArgsTypes, false);
 
+    if(TheModule->getFunction(Name)) {
+        throw SemanticError("Function `" + Name + "` previously declared", this->Tok);
+    }
+
     Function *F = Function::Create(FT, Function::ExternalLinkage, Name, TheModule.get());
+
+    // Set the names of the arguments
     for(auto &arg : F->args()) {
         arg.setName(Args[arg.getArgNo()]->getName());
     }
-
-    //TODO: error, redeclaration
 
     // Function body
     BasicBlock *BB = BasicBlock::Create(*TheContext, "entry", F);
@@ -446,16 +438,14 @@ Value *FunctionDeclASTNode::codegen() {
                 break;
         }
     }
-    //Builder->CreateReerrst(ConstantInt::get(*TheContext, APInt(32, 0, true)));
+
     VariableScope.popScope();
     // Ensure the function is valid
-    if(verifyFunction(*F, &llvm::outs())) {
-        throw "HELLO";
-        return F;
-    } else {
-        //TODO: error
-        return F;
+    if(verifyFunction(*F, &llvm::errs())) {
+        throw SemanticError("Function `" + Name + "` is invalid. See error output.", this->Tok);
     }
+
+    return F;
 }
 
 Value *ExternFunctionDeclASTNode::codegen() {
@@ -465,7 +455,6 @@ Value *ExternFunctionDeclASTNode::codegen() {
         ArgsTypes.push_back(GetType(arg->getType()));
     }
 
-    //TODO: types
     FunctionType *FT = FunctionType::get(GetType(ReturnType), ArgsTypes, false);
 
     Function *F = Function::Create(FT, Function::ExternalLinkage, Name, TheModule.get());
