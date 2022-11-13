@@ -231,12 +231,12 @@ class CallExprAST : public ExprASTNode
   std::string FunctionName;
   std::vector<std::unique_ptr<ExprASTNode>> Args;
 
-  TOKEN tok;
+  TOKEN Tok;
 
 public:
   CallExprAST(TOKEN tok, std::string &&funcName,
               std::vector<std::unique_ptr<ExprASTNode>> Args)
-      : tok(tok), FunctionName(funcName), Args(std::move(Args)) {}
+      : Tok(tok), FunctionName(funcName), Args(std::move(Args)) {}
   Value *codegen() override;
 
   std::shared_ptr<ASTPrint> to_ast_print() override

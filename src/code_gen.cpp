@@ -20,6 +20,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
 #include<map>
 #include<memory>
@@ -95,15 +96,13 @@ Value *BoolASTNode::codegen() {
     return ConstantInt::get(*TheContext, APInt(32, (int)Val, true));
 }
 
-std::function<Value*(TOKEN_TYPE Op, llvm::Value *L, const llvm::Twine &Name)> unary_op_builder =
-    [](TOKEN_TYPE Op, llvm::Value *L, const llvm::Twine &Name) -> Value *{
+inline Value *unary_op_builder(TOKEN_TYPE Op, llvm::Value *L, const llvm::Twine &Name) {
         switch(Op) {
             case TOKEN_TYPE::MINUS:
                 return L->getType()->getTypeID() == Type::TypeID::FloatTyID ? 
                     Builder->CreateFNeg(L, Name) : 
                     Builder->CreateNeg(L, Name);
             case TOKEN_TYPE::NOT:
-                //return Builder->CreateNot(L, Name);
                 return L->getType()->getTypeID() == Type::TypeID::FloatTyID ? 
                     VariableCaster->ensureInteger(Builder->CreateFCmpOEQ(L, ConstantFP::get(*TheContext, APFloat(0.0)), Name)) : 
                     VariableCaster->ensureInteger(Builder->CreateICmpEQ(L, ConstantInt::get(*TheContext, APInt(32, 0, true)), Name)); 
@@ -162,7 +161,7 @@ inline Value *operation_function(Type::TypeID type, TOKEN_TYPE Op, llvm::Value *
             case TOKEN_TYPE::LT:
                 return BuildInt(type, Builder->CreateICmpSLT, Builder->CreateFCmpOLT);
             default:
-                return nullptr;
+                throw std::runtime_error("Invalid binary operator");
         }
     };
 
@@ -192,15 +191,28 @@ Value *VariableRefASTNode::codegen() {
 Value *CallExprAST::codegen() {
     Function *Function = TheModule->getFunction(FunctionName);
 
-    //TODO: error, non-existent
-    //TODO: error, arg-size & types 
+    if(!Function) {
+        SemanticError("Unknown function referenced: " + FunctionName, Tok);
+    }
+    if(Function->getFunctionType()->getNumParams() != Args.size()) {
+        SemanticError("Function `" + FunctionName + "` expects `" + std::to_string(Function->getFunctionType()->getNumParams()) + "` arguments, but `" + std::to_string(Args.size()) + "` were provided", Tok);
+    }
 
     std::vector<Value *> ArgsIR;
 
-    for(auto &arg : Args) {
-        ArgsIR.push_back(arg->codegen());
-    }
+    for(int i = 0; i < Args.size(); i++) {
 
+        Value *gen = Args[i]->codegen();
+
+        // TODO: test
+        if(gen->getType() != Function->getFunctionType()->getParamType(i)) {
+            gen = VariableCaster->narrowingCast(gen, Function->getFunctionType()->getParamType(i));
+
+            SemanticWarning("Implicit cast from `" + type_to_string(gen->getType()) + "` to `" + type_to_string(Function->getFunctionType()->getParamType(i)) + "`.", Tok);
+        }
+
+        ArgsIR.push_back(gen);
+    }
     // A name can not be assigned to a function call which returns void
     std::string name = Function->getReturnType()->isVoidTy() ? "" : "call_tmp";
 
@@ -211,8 +223,7 @@ Value *AssignmentASTNode::codegen() {
     Value *Val = RHS->codegen();
 
     if(!Val) {
-        //TODO: throw error
-        //return nullptr;
+        SemanticError("Invalid assignment of expression", Tok);
     }
 
     auto [Alloca, _] = VariableScope.getVariable(Name);
@@ -235,14 +246,19 @@ Value *BlockASTNode::codegen() {
 
     std::vector<Value *> stmtCode;
     for(auto &stmt: this->Statements) {
-        // if(Builder->GetInsertBlock()->getTerminator()) {
-        //     break;
-        // }
         stmtCode.push_back(stmt->codegen());
     }
 
     VariableScope.popScope();
     return Builder->GetInsertBlock();
+}
+
+Value *addConditionComparison(Value *CondV) {
+    if(CondV->getType()->getTypeID() != Type::TypeID::FloatTyID) {
+        return Builder->CreateICmpNE(CondV, ConstantInt::get(*TheContext, APInt(CondV->getType()->getIntegerBitWidth(), 0, true)), "whilecond");
+    } else {
+        return Builder->CreateFCmpONE(CondV, ConstantFP::get(*TheContext, APFloat(0.0f)), "whilecond");
+    }
 }
 
 Value *IfElseASTNode::codegen() {
@@ -251,13 +267,7 @@ Value *IfElseASTNode::codegen() {
         return nullptr;
     }
     
-    // TODO
-    if(CondV->getType()->getTypeID() != Type::TypeID::FloatTyID) {
-        CondV = Builder->CreateICmpNE(CondV, ConstantInt::get(*TheContext, APInt(32, 0, true)), "ifcond");
-    } else {
-        CondV = Builder->CreateFCmpONE(CondV, ConstantFP::get(*TheContext, APFloat(0.0f)), "ifcond");
-    }
-
+    CondV = addConditionComparison(CondV);
 
     Function *TheFunction = Builder->GetInsertBlock()->getParent();
 
@@ -317,14 +327,7 @@ Value *WhileASTNode::codegen() {
         return nullptr;
     }
 
-    //CondV = Builder->CreateICmpNE(CondV, ConstantInt::get(*TheContext, APInt(32, 0, true)), "whilecond");
-
-    if(CondV->getType()->getTypeID() != Type::TypeID::FloatTyID) {
-        CondV = Builder->CreateICmpNE(CondV, ConstantInt::get(*TheContext, APInt(32, 0, true)), "whilecond");
-    } else {
-        CondV = Builder->CreateFCmpONE(CondV, ConstantFP::get(*TheContext, APFloat(0.0f)), "whilecond");
-    }
-
+    addConditionComparison(CondV);
     Builder->CreateCondBr(CondV, BodyBB, AfterBB);
 
     // Create new scope for body 
@@ -367,6 +370,10 @@ Value *ReturnStmtASTNode::codegen() {
 
 Value *VariableDeclASTNode::codegen() {
     if(Builder->GetInsertBlock() == nullptr) {
+        if(VariableScope.isGlobalVariableDeclared(Name)) {
+            SemanticError("Variable `" + Name + "` has already been declared.", Tok);
+        }
+
         Constant *consta = Type == VariableType::FLOAT ? (Constant *)ConstantFP::get(*TheContext, APFloat(0.0f)) : (Constant *)ConstantInt::get(*TheContext, APInt(32, 0, true));
         GlobalVariable* g =
             new GlobalVariable(*TheModule, GetType(Type), false, GlobalValue::CommonLinkage, consta, Name);
@@ -440,10 +447,14 @@ Value *FunctionDeclASTNode::codegen() {
     }
 
     VariableScope.popScope();
+
+    EliminateUnreachableBlocks(*F);
+    
     // Ensure the function is valid
     if(verifyFunction(*F, &llvm::errs())) {
         throw SemanticError("Function `" + Name + "` is invalid. See error output.", this->Tok);
     }
+
 
     return F;
 }
@@ -488,6 +499,7 @@ Value *ProgramASTNode::codegen() {
     for(auto &decl: Declarations) {
         declCode.push_back(decl->codegen());
     }
+
 
     return nullptr;
 }

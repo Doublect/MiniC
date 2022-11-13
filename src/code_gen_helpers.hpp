@@ -65,6 +65,10 @@
             // TODO: Error
             throw std::runtime_error("Variable not found: " + Name);
         }
+
+        bool isGlobalVariableDeclared(const std::string &Name) {
+            return GlobalVariables.contains(Name);
+        }
     };
 
     // The lifetime of caster is the same as the lifetime of the builder.
@@ -85,7 +89,7 @@
                 return V;
             }
             // TODO: disallow
-            return Builder->CreateFPToSI(V, Type::getInt32Ty(*TheContext), "inttmp");
+            throw std::runtime_error("Cannot upcast non-integer to integer");
         }
 
         Value *ensureFloat(Value *V)
@@ -115,6 +119,28 @@
             Type::TypeID typeID = std::min(L->getType()->getTypeID(), R->getType()->getTypeID());
             
             return std::make_tuple(ensureType(L, typeID), ensureType(R, typeID), typeID); 
+        }
+
+        Value *narrowingCast(Value *L, Type *R) {
+            // widening cast
+            if(R->getTypeID() > L->getType()->getTypeID()) {
+                return ensureType(L, R->getTypeID());
+            }
+
+            // narrowing cast
+            if(R->getTypeID() == Type::TypeID::FloatTyID) {
+                return L;
+            }
+
+            if(L->getType()->isFloatTy()) {
+                L = Builder->CreateFPToSI(L, Type::getInt32Ty(*TheContext), "float_to_int32");
+            }
+
+            if(R->getIntegerBitWidth() == 32) {
+                return L;
+            }
+
+            return Builder->CreateICmpNE(L, ConstantInt::get(*TheContext, APInt(32, 0, true)), "int32_to_bool");
         }
     };
 
@@ -155,4 +181,19 @@
         SemanticWarning(std::string msg, int LineNo, int ColumnNo) : problem(new SemanticProblem(msg, LineNo, ColumnNo)) {}
         SemanticWarning(std::string msg, TOKEN tok) : problem(new SemanticProblem(msg, tok)) {}
     };
+
+    constexpr std::string type_to_string(Type *type) {
+        if(type->isFloatTy()) {
+            return "float";
+        }
+        if(type->isIntegerTy()) {
+            if(type->getIntegerBitWidth() == 1) {
+                return "bool";
+            }
+
+            return "int";
+        }
+
+        throw std::runtime_error("Unexpected type");
+    }
 #endif
