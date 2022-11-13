@@ -31,6 +31,7 @@
 
 #include "ast.hpp"
 #include "helpers.hpp"
+#include "code_gen_helpers.hpp"
 
 #define BuildInt(var, a, b) var != Type::TypeID::FloatTyID ? a(L, R, Name) : b(L, R, Name)
 
@@ -38,81 +39,12 @@
 // Code Generation
 //===----------------------------------------------------------------------===//
 
-std::unique_ptr<LLVMContext> TheContext;
+std::shared_ptr<LLVMContext> TheContext;
 std::unique_ptr<Module> TheModule;
-std::unique_ptr<IRBuilder<>> Builder;
-
-class VariableScopeManager {
-    std::map<std::string, GlobalVariable *> GlobalVariables;
-    std::map<std::string, std::stack<AllocaInst *>> NamedValues;
-    std::stack<std::set<std::string>> ScopeStack;
-
-public:
-    VariableScopeManager() {
-        ScopeStack.push(std::set<std::string>());
-    }
-
-    void pushScope() {
-        ScopeStack.push(std::set<std::string>());
-
-        print_a_debug("Opening scope" + std::to_string(ScopeStack.size()));
-    }
-
-    void popScope() {
-        print_a_debug("Closing scope" + std::to_string(ScopeStack.size()));
-
-        for (auto &Name : ScopeStack.top()) {
-            NamedValues[Name].pop();
-        }
-        ScopeStack.pop();
-    }
-
-    void addVariable(const std::string &Name, AllocaInst *Alloca) {
-        NamedValues[Name].push(Alloca);
-        ScopeStack.top().insert(Name);
-    }
-
-    void addVariable(const std::string &Name, GlobalVariable *Global) {
-        //TODO: redecl?
-        GlobalVariables[Name] = Global;
-    }
-
-    std::tuple<Value *, Type *>getVariable(const std::string &Name) {
-        print_a_debug("Searching for variable: " + Name);
-
-        if(NamedValues.contains(Name) && NamedValues[Name].size() > 0) {
-            return std::make_tuple(NamedValues[Name].top(), NamedValues[Name].top()->getAllocatedType());
-        }
-
-        if(GlobalVariables.contains(Name)) {
-            return std::make_tuple(GlobalVariables[Name], GlobalVariables[Name]->getValueType());
-        }
-        // TODO: Error
-        throw std::runtime_error("Variable not found: " + Name);
-    }
-};
+std::shared_ptr<IRBuilder<>> Builder;
 
 VariableScopeManager VariableScope;
-
-Value *ensureInteger(Value *V) {
-    if (V->getType()->isIntegerTy()) {
-        if(V->getType()->getIntegerBitWidth() == 1) {
-            return Builder->CreateZExt(V, Type::getInt32Ty(*TheContext), "bool_to_int");
-        }
-        return V;
-    }
-    // TODO: disallow
-    return Builder->CreateFPToSI(V, Type::getInt32Ty(*TheContext), "inttmp");
-}
-
-Value *ensureFloat(Value *V) {
-    if (V->getType()->isFloatingPointTy()) {
-        return V;
-    }
-
-    V = ensureInteger(V);
-    return Builder->CreateSIToFP(V, Type::getFloatTy(*TheContext), "floattmp");
-}
+std::unique_ptr<VariableCastManager> VariableCaster;
 
 static Type *GetType(VariableType Type) {
     switch (Type) {
@@ -173,8 +105,8 @@ std::function<Value*(TOKEN_TYPE Op, llvm::Value *L, const llvm::Twine &Name)> un
             case TOKEN_TYPE::NOT:
                 //return Builder->CreateNot(L, Name);
                 return L->getType()->getTypeID() == Type::TypeID::FloatTyID ? 
-                    ensureInteger(Builder->CreateFCmpOEQ(L, ConstantFP::get(*TheContext, APFloat(0.0)), Name)) : 
-                    ensureInteger(Builder->CreateICmpEQ(L, ConstantInt::get(*TheContext, APInt(32, 0, true)), Name)); 
+                    VariableCaster->ensureInteger(Builder->CreateFCmpOEQ(L, ConstantFP::get(*TheContext, APFloat(0.0)), Name)) : 
+                    VariableCaster->ensureInteger(Builder->CreateICmpEQ(L, ConstantInt::get(*TheContext, APInt(32, 0, true)), Name)); 
             default:
                 return nullptr;
                 //TODO: Error
@@ -239,28 +171,26 @@ auto operation_function =
 Value *BinaryASTNode::codegen() {
     Value *L = LHS->codegen();
     Value *R = RHS->codegen();
-
-    //TODO: bool type checking
     
     Type::TypeID typeID = std::min(L->getType()->getTypeID(), R->getType()->getTypeID());
 
     // std::cout << L->getType()->getTypeID() << " " << R->getType()->getTypeID() << std::endl;
 
     if(typeID == Type::TypeID::IntegerTyID) {
-        L = ensureInteger(L);
-        R = ensureInteger(R);
+        L = VariableCaster->ensureInteger(L);
+        R = VariableCaster->ensureInteger(R);
     }
     if(typeID == Type::TypeID::FloatTyID) {
-        L = ensureFloat(L);
-        R = ensureFloat(R);
+        L = VariableCaster->ensureFloat(L);
+        R = VariableCaster->ensureFloat(R);
     }
 
     auto res = operation_function(typeID, Op, L, R, "binary_op");
 
     if(typeID == Type::TypeID::IntegerTyID) {
-        res = ensureInteger(res);
+        res = VariableCaster->ensureInteger(res);
     } else {
-        res = ensureFloat(res);
+        res = VariableCaster->ensureFloat(res);
     }
     //TODO: emit warning
     return res;
@@ -268,10 +198,8 @@ Value *BinaryASTNode::codegen() {
 
 Value *VariableRefASTNode::codegen() {
     auto [V, Type] = VariableScope.getVariable(Name);
-    //std::cout << "Found variable ref: " << Name << std::endl;
-    //std::cout << Builder->GetInsertBlock()->getModule() << std::endl;
 
-    // std::cout << "Found variable: " << Name << " Loading type: " << V->getAllocatedType()->getTypeID() << std::endl;
+    print_a_debug("Found variable reference: " + Name);
 
     return Builder->CreateLoad(Type, V, Name.c_str());
 }
@@ -372,10 +300,6 @@ Value *IfElseASTNode::codegen() {
 
     if(Else) {
         Value *ElseV = Else->codegen();
-        
-        //TODO: do I really need this?
-        if(!ElseV)
-            return nullptr;
     }
 
     if(!Builder->GetInsertBlock()->getTerminator()) {
@@ -555,11 +479,12 @@ Value *ExternFunctionDeclASTNode::codegen() {
 
 static void InitializeModule() {
   // Open a new context and module.
-  TheContext = std::make_unique<LLVMContext>();
+  TheContext = std::make_shared<LLVMContext>();
   TheModule = std::make_unique<Module>("mini-c", *TheContext);
 
   // Create a new builder for the module.
-  Builder = std::make_unique<IRBuilder<>>(*TheContext);
+  Builder = std::make_shared<IRBuilder<>>(*TheContext);
+  VariableCaster = std::make_unique<VariableCastManager>(VariableCastManager(Builder, TheContext));
 }
 
 Value *ProgramASTNode::codegen() {

@@ -5,7 +5,8 @@ CFLAGS= -g `llvm-config --cppflags --ldflags --system-libs --libs all` \
 -Wpessimizing-move -Wredundant-move -ferror-limit=5
 SRCF = src
 BUILDF = build
-DEPS = $(BUILDF)/ast.o $(BUILDF)/ast_print.o $(BUILDF)/code_gen.o $(BUILDF)/helpers.o $(BUILDF)/lexer.o $(BUILDF)/parser.o
+DEPS = $(BUILDF)/ast.o $(BUILDF)/ast_print.o $(BUILDF)/code_gen.o $(BUILDF)/code_gen_helpers.o\
+ $(BUILDF)/helpers.o $(BUILDF)/lexer.o $(BUILDF)/parser.o
 
 mccomp: $(SRCF)/mccomp.cpp $(DEPS)
 	$(CXX) $^ $(CFLAGS) -o mccomp
