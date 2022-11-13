@@ -356,9 +356,21 @@ Value *WhileASTNode::codegen() {
 
 Value *ReturnStmtASTNode::codegen() {
     Value *RetVal = Expr ? Expr->codegen() : nullptr;
+    Function *F = Builder->GetInsertBlock()->getParent();
+
+    if(!F) {
+        SemanticError("Return statement outside of function", Tok);
+    }
+
+    // If there is a return value, check if it is the same type as the function (int, bool, float)
+    // If there is no return value, check if the function is void
+    if((!RetVal && Type::getVoidTy(*TheContext) != F->getReturnType()) || (RetVal && RetVal->getType() != F->getReturnType())) {
+        std::string retValName = RetVal ? type_to_string(RetVal->getType()) : "void";
+        SemanticError("Cannot return value of type `" + retValName + "` in function returning type `" + type_to_string(F->getReturnType()) + "`.", Tok);
+    }
 
     Builder->CreateRet(RetVal);
-    BasicBlock *AfterBB = BasicBlock::Create(*TheContext, "afterreturn", Builder->GetInsertBlock()->getParent());
+    BasicBlock *AfterBB = BasicBlock::Create(*TheContext, "afterreturn", F);
     Builder->SetInsertPoint(AfterBB);
 
     return RetVal;
