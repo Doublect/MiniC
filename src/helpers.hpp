@@ -70,7 +70,9 @@
 
             template<typename U> 
             ResultMonad(ResultMonad<U> &&other) {
-                std::cout << "Warning: Move constructor can only convert from a ResultMonad<T> to a ResultMonad<U> if T is convertible to U." << std::endl;
+                if(other.success()) {
+                    std::cout << "Warning: Move constructor can only convert from a ResultMonad<T> to a ResultMonad<U> if T is convertible to U." << std::endl;
+                }
                 err = other.error();
                 success_val = false;
             }

@@ -61,7 +61,6 @@ static TOKEN CurTok;
 static std::deque<TOKEN> tok_buffer;
 
 TOKEN getNextToken() {
-
   if (tok_buffer.size() == 0)
     tok_buffer.push_back(gettok(pFile));
 
@@ -202,8 +201,6 @@ static auto literals =
     return make_result<ExprASTNode>(ErrorT("Expected literal, got: "s + std::to_string(CurTok.type), CurTok));
   };
 
-//ParserFunction<ExprASTNode, std::optional<std::unique_ptr<ExprASTNode>>> or_expr;
-
 static ResultMonad<ExprASTNode> expr();
 
 static ResultMonad<std::vector<std::unique_ptr<ExprASTNode>>> args() {
@@ -237,13 +234,6 @@ static ResultMonad<ExprASTNode> primary_expr() {
       return make_result(CallExprAST(CurTok, std::move(varName), std::move(*nodes.release())));
     }
 
-    if(CurTok.type == TOKEN_TYPE::ASSIGN) {
-      // Skip `=` token
-      getNextToken();
-      Consume(ExprASTNode, node, expr);
-      return make_result(AssignmentASTNode(CurTok, std::move(varName), std::move(node)));
-    }
-
     return make_result(VariableRefASTNode(CurTok, std::move(varName)));
   } else {
     return literals();
@@ -271,12 +261,12 @@ ResultMonad<ExprASTNode> prime_binary(ParserFunction<ExprASTNode> next, std::vec
   std::unique_ptr<ExprASTNode> lhs = std::move(p);
 
   if(std::find(ops.begin(), ops.end(), CurTok.type) != ops.end()) {
+    TOKEN startTok = CurTok;
     ConsumeVal(TOKEN_TYPE, op, token_type);
-    TOKEN opTok = CurTok;
     // Evaluate lower expression
     Consume(ExprASTNode, rhs, next);
 
-    lhs = unique_ptr_cast<ExprASTNode>(BinaryASTNode(op, std::move(lhs), std::move(rhs), CurTok));    
+    lhs = unique_ptr_cast<ExprASTNode>(BinaryASTNode(op, std::move(lhs), std::move(rhs), startTok));    
 
     // Recursion
     return prime_binary(next, ops, std::move(lhs));
@@ -290,16 +280,18 @@ ResultMonad<ExprASTNode> prime_binary(ParserFunction<ExprASTNode> next, std::vec
 static ParserFunction<ExprASTNode> unary_expr = 
   []() -> ResultMonad<ExprASTNode> {
     if(CurTok.type == TOKEN_TYPE::MINUS || CurTok.type == TOKEN_TYPE::NOT) {
+      TOKEN startTok = CurTok;
       ConsumeVal(TOKEN_TYPE, op, token_type);
       Consume(ExprASTNode, unary, unary_expr);
       
-      return make_result(UnaryASTNode(op, std::move(unary), CurTok));
+      return make_result(UnaryASTNode(op, std::move(unary), startTok));
     }
 
     return parentheses_expr();
   };
 
 static auto mul_expr_prime(std::unique_ptr<ExprASTNode> p) {
+  std::cout << "Mul expr prime" << std::endl;
   return prime_binary(unary_expr, {TOKEN_TYPE::ASTERIX, TOKEN_TYPE::DIV, TOKEN_TYPE::MOD}, std::move(p));
 };
 
@@ -308,7 +300,7 @@ static auto mul_expr() {
 }
 
 static auto add_expr_prime(std::unique_ptr<ExprASTNode> p) {
-  return prime_binary(unary_expr, {TOKEN_TYPE::PLUS, TOKEN_TYPE::MINUS}, std::move(p));
+  return prime_binary(mul_expr, {TOKEN_TYPE::PLUS, TOKEN_TYPE::MINUS}, std::move(p));
 };
 
 static auto add_expr() {
@@ -316,7 +308,7 @@ static auto add_expr() {
 } 
 
 static auto rel_expr_prime(std::unique_ptr<ExprASTNode> p) {
-  return prime_binary(unary_expr, {TOKEN_TYPE::LT, TOKEN_TYPE::LE, TOKEN_TYPE::GT, TOKEN_TYPE::GE}, std::move(p));
+  return prime_binary(add_expr, {TOKEN_TYPE::LT, TOKEN_TYPE::LE, TOKEN_TYPE::GT, TOKEN_TYPE::GE}, std::move(p));
 };
 
 static auto rel_expr() {
@@ -330,6 +322,7 @@ static auto eq_expr_prime(std::unique_ptr<ExprASTNode> p) {
 static auto eq_expr() {
   return base_binary(rel_expr, eq_expr_prime);
 }
+
 static auto and_expr_prime(std::unique_ptr<ExprASTNode> p) {
   return prime_binary(eq_expr, {TOKEN_TYPE::AND}, std::move(p));
 }
@@ -338,12 +331,30 @@ static auto and_expr() {
   return base_binary(eq_expr, and_expr_prime);
 }
 
-static auto expr_prime(std::unique_ptr<ExprASTNode> p) {
+static auto or_prime(std::unique_ptr<ExprASTNode> p) {
   return prime_binary(and_expr, {TOKEN_TYPE::OR}, std::move(p));
 }
 
+static auto or_expr() {
+  return base_binary(and_expr, or_prime);
+}
+
 static ResultMonad<ExprASTNode> expr() {
-  return base_binary(and_expr, expr_prime);
+  if(CurTok.type == TOKEN_TYPE::IDENT) {
+    TOKEN identTok = CurTok;
+    ConsumeVal(std::string, varName, ident);
+
+    if(CurTok.type == TOKEN_TYPE::ASSIGN) {
+      // Skip `=` token
+      getNextToken();
+      Consume(ExprASTNode, node, expr);
+      return make_result(AssignmentASTNode(CurTok, std::move(varName), std::move(node)));
+    } else {
+      putBackToken(CurTok);
+      CurTok = identTok;
+    }
+  }
+  return or_expr();
 }
 
 #pragma endregion
@@ -443,15 +454,6 @@ static ResultMonad<ReturnStmtASTNode> return_stmt() {
     return make_result(ReturnStmtASTNode(std::move(exp), startTok));
   };
 
-static ResultMonad<AssignmentASTNode> assign_stmt() {
-    ConsumeVal(std::string, name, ident);
-    Expect(TOKEN_TYPE::ASSIGN);
-    Consume(ExprASTNode, exp, expr);
-    Expect(TOKEN_TYPE::SC);
-
-    return make_result(AssignmentASTNode(CurTok, std::move(name), std::move(exp)));
-  };
-
 static ResultMonad<StatementASTNode> stmt() {
   if(CurTok.type == TOKEN_TYPE::IF) {
     return if_stmt();
@@ -463,6 +465,7 @@ static ResultMonad<StatementASTNode> stmt() {
     return block();
   } else if(isExprFirst()) {
     Consume(ExprASTNode, stmt, expr);
+    std::cout << "PARSED expr" << std::endl;
     Expect(TOKEN_TYPE::SC);
     return make_result_ptr(std::move(stmt));
   }
