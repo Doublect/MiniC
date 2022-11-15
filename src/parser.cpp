@@ -262,39 +262,30 @@ static ResultMonad<ExprASTNode> parentheses_expr() {
   return primary_expr();
 };
 
-
-auto generic_binary_expr(ParserFunction<ExprASTNode> next, std::vector<TOKEN_TYPE> ops) {
-    ParserFunction<ExprASTNode> base;
-    ParserFunction<ExprASTNode, std::unique_ptr<ExprASTNode>> prime;
-    
-    prime = [next, ops, &prime](std::unique_ptr<ExprASTNode> p) -> ResultMonad<ExprASTNode> {
-      std::unique_ptr<ExprASTNode> lhs = std::move(p);
-
-      std::cout << "Prime: " << CurTok.lexeme << " " << ops[0] << std::endl;
-      if(std::find(ops.begin(), ops.end(), CurTok.type) != ops.end()) {
-        ConsumeVal(TOKEN_TYPE, op, token_type);
-        TOKEN opTok = CurTok;
-        // Evaluate lower expression
-        Consume(ExprASTNode, rhs, next);
-
-        lhs = unique_ptr_cast<ExprASTNode>(BinaryASTNode(op, std::move(lhs), std::move(rhs), CurTok));    
-
-        // Recursion
-        return prime(std::move(lhs));
-      }
-
-      // Epsilon
-      return make_result_ptr(std::move(lhs));
-    };
-
-  base = [next, ops, prime]() -> ResultMonad<ExprASTNode> {
-    std::cout << "Base: " << CurTok.lexeme << " " << CurTok.lineNo << std::endl;
-    Consume(ExprASTNode, lhs, next);
-    return prime(std::move(lhs));
-  };
-
-  return base;
+ ResultMonad<ExprASTNode> base_binary(ParserFunction<ExprASTNode> next, ParserFunction<ExprASTNode, std::unique_ptr<ExprASTNode>> prime) {
+  Consume(ExprASTNode, lhs, next);
+  return prime(std::move(lhs));
 };
+
+ResultMonad<ExprASTNode> prime_binary(ParserFunction<ExprASTNode> next, std::vector<TOKEN_TYPE> ops, std::unique_ptr<ExprASTNode> p) {
+  std::unique_ptr<ExprASTNode> lhs = std::move(p);
+
+  if(std::find(ops.begin(), ops.end(), CurTok.type) != ops.end()) {
+    ConsumeVal(TOKEN_TYPE, op, token_type);
+    TOKEN opTok = CurTok;
+    // Evaluate lower expression
+    Consume(ExprASTNode, rhs, next);
+
+    lhs = unique_ptr_cast<ExprASTNode>(BinaryASTNode(op, std::move(lhs), std::move(rhs), CurTok));    
+
+    // Recursion
+    return prime_binary(next, ops, std::move(lhs));
+  }
+
+  // Epsilon
+  return make_result_ptr(std::move(lhs));
+};
+
 
 static ParserFunction<ExprASTNode> unary_expr = 
   []() -> ResultMonad<ExprASTNode> {
@@ -308,18 +299,51 @@ static ParserFunction<ExprASTNode> unary_expr =
     return parentheses_expr();
   };
 
-static auto mul_expr = generic_binary_expr(unary_expr, {TOKEN_TYPE::ASTERIX, TOKEN_TYPE::DIV, TOKEN_TYPE::MOD});
+static auto mul_expr_prime(std::unique_ptr<ExprASTNode> p) {
+  return prime_binary(unary_expr, {TOKEN_TYPE::ASTERIX, TOKEN_TYPE::DIV, TOKEN_TYPE::MOD}, std::move(p));
+};
 
-static auto add_expr = generic_binary_expr(mul_expr, {TOKEN_TYPE::PLUS, TOKEN_TYPE::MINUS});
+static auto mul_expr() {
+  return base_binary(unary_expr, mul_expr_prime);
+}
 
-static auto rel_expr = generic_binary_expr(add_expr, {TOKEN_TYPE::LT, TOKEN_TYPE::LE, TOKEN_TYPE::GT, TOKEN_TYPE::GE});
+static auto add_expr_prime(std::unique_ptr<ExprASTNode> p) {
+  return prime_binary(unary_expr, {TOKEN_TYPE::PLUS, TOKEN_TYPE::MINUS}, std::move(p));
+};
 
-static auto eq_expr = generic_binary_expr(rel_expr, {TOKEN_TYPE::EQ, TOKEN_TYPE::NE});
+static auto add_expr() {
+  return base_binary(mul_expr, add_expr_prime);
+} 
 
-static auto and_expr = generic_binary_expr(eq_expr, {TOKEN_TYPE::AND});
+static auto rel_expr_prime(std::unique_ptr<ExprASTNode> p) {
+  return prime_binary(unary_expr, {TOKEN_TYPE::LT, TOKEN_TYPE::LE, TOKEN_TYPE::GT, TOKEN_TYPE::GE}, std::move(p));
+};
+
+static auto rel_expr() {
+  return base_binary(add_expr, rel_expr_prime);
+} 
+
+static auto eq_expr_prime(std::unique_ptr<ExprASTNode> p) {
+  return prime_binary(rel_expr, {TOKEN_TYPE::EQ, TOKEN_TYPE::NE}, std::move(p));
+}
+
+static auto eq_expr() {
+  return base_binary(rel_expr, eq_expr_prime);
+}
+static auto and_expr_prime(std::unique_ptr<ExprASTNode> p) {
+  return prime_binary(eq_expr, {TOKEN_TYPE::AND}, std::move(p));
+}
+
+static auto and_expr() {
+  return base_binary(eq_expr, and_expr_prime);
+}
+
+static auto expr_prime(std::unique_ptr<ExprASTNode> p) {
+  return prime_binary(and_expr, {TOKEN_TYPE::OR}, std::move(p));
+}
 
 static ResultMonad<ExprASTNode> expr() {
-  return generic_binary_expr(and_expr, {TOKEN_TYPE::OR})();
+  return base_binary(and_expr, expr_prime);
 }
 
 #pragma endregion
