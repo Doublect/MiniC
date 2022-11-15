@@ -88,7 +88,7 @@
                 }
                 return V;
             }
-            // TODO: disallow
+
             throw std::runtime_error("Cannot upcast non-integer to integer");
         }
 

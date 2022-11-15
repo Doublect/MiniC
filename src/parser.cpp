@@ -16,10 +16,7 @@ extern std::string IdentifierStr;
 extern int IntVal;
 extern bool BoolVal;
 extern float FloatVal;
-extern std::string StringVal;     
-
-#define BOOST_STACKTRACE_USE_ADDR2LINE
-#include "boost/stacktrace.hpp"
+extern std::string StringVal;
 
 using namespace std::string_literals;
 
@@ -128,7 +125,7 @@ auto type_spec =
       return make_result(std::move(tst));
     }
 
-    return make_result<TypeSpecType>(ErrorT("Expected type specifier, got: "s + std::to_string(CurTok.type)));
+    return make_result<TypeSpecType>(ErrorT("Expected type specifier, got: "s + std::to_string(CurTok.type), CurTok));
   };
 
 auto var_type = 
@@ -191,7 +188,7 @@ static auto literals =
       return make_result(IntASTNode(CurTok, value));
     } else if(CurTok.type == TOKEN_TYPE::FLOAT_LIT) {
       float value = FloatVal;
-      // std::cout << "Read float: " << value << std::endl;
+      std::cout << "Read float: " << value << std::endl;
       getNextToken();
 
       return make_result(FloatASTNode(CurTok, value));
@@ -201,16 +198,13 @@ static auto literals =
 
       return make_result(BoolASTNode(CurTok, value));
     }
-
+    std::cout << "Read token: " << CurTok.type << std::endl;
     return make_result<ExprASTNode>(ErrorT("Expected literal, got: "s + std::to_string(CurTok.type), CurTok));
   };
 
-static ResultMonad<ExprASTNode> or_expr(std::optional<std::unique_ptr<ExprASTNode>> p);
 //ParserFunction<ExprASTNode, std::optional<std::unique_ptr<ExprASTNode>>> or_expr;
 
-static ParserFunction<ExprASTNode> expr = []() {
-  return or_expr(std::nullopt);
-};
+static ResultMonad<ExprASTNode> expr();
 
 static ResultMonad<std::vector<std::unique_ptr<ExprASTNode>>> args() {
   Expect(TOKEN_TYPE::LPAR);
@@ -234,6 +228,7 @@ static ResultMonad<std::vector<std::unique_ptr<ExprASTNode>>> args() {
 };
 
 static ResultMonad<ExprASTNode> primary_expr() {
+  std::cout << "Primary expr " << (CurTok.type == TOKEN_TYPE::IDENT) << " " << abs(CurTok.lineNo) << std::endl;
   if(CurTok.type == TOKEN_TYPE::IDENT) {
     ConsumeVal(std::string, varName, ident);
 
@@ -243,6 +238,7 @@ static ResultMonad<ExprASTNode> primary_expr() {
     }
 
     if(CurTok.type == TOKEN_TYPE::ASSIGN) {
+      // Skip `=` token
       getNextToken();
       Consume(ExprASTNode, node, expr);
       return make_result(AssignmentASTNode(CurTok, std::move(varName), std::move(node)));
@@ -257,7 +253,7 @@ static ResultMonad<ExprASTNode> primary_expr() {
 
 static ResultMonad<ExprASTNode> parentheses_expr() {
   if(CurTok.type == TOKEN_TYPE::LPAR) {
-    getNextToken();
+    Expect(TOKEN_TYPE::LPAR);
     Consume(ExprASTNode, primary, expr);
     Expect(TOKEN_TYPE::RPAR);
     return make_result_ptr(std::move(primary));
@@ -266,35 +262,38 @@ static ResultMonad<ExprASTNode> parentheses_expr() {
   return primary_expr();
 };
 
-auto generic_binary_expr(ParserFunction<ExprASTNode, std::optional<std::unique_ptr<ExprASTNode>>> next, std::vector<TOKEN_TYPE> ops) {
-    ParserFunction<ExprASTNode, std::optional<std::unique_ptr<ExprASTNode>>> self;
-    
-    self = [next, ops, &self](std::optional<std::unique_ptr<ExprASTNode>> p) -> ResultMonad<ExprASTNode> {
-      std::unique_ptr<ExprASTNode> lhs;
 
-      if(p.has_value()) { 
-        lhs = std::move(p.value());
+auto generic_binary_expr(ParserFunction<ExprASTNode> next, std::vector<TOKEN_TYPE> ops) {
+    ParserFunction<ExprASTNode> base;
+    ParserFunction<ExprASTNode, std::unique_ptr<ExprASTNode>> prime;
+    
+    prime = [next, ops, &prime](std::unique_ptr<ExprASTNode> p) -> ResultMonad<ExprASTNode> {
+      std::unique_ptr<ExprASTNode> lhs = std::move(p);
+
+      std::cout << "Prime: " << CurTok.lexeme << " " << ops[0] << std::endl;
+      if(std::find(ops.begin(), ops.end(), CurTok.type) != ops.end()) {
         ConsumeVal(TOKEN_TYPE, op, token_type);
         TOKEN opTok = CurTok;
-        ConsumeNoCall(ExprASTNode, rhs, next(std::nullopt));
+        // Evaluate lower expression
+        Consume(ExprASTNode, rhs, next);
 
-        // We have two expressions, create the new node & propagate onwards
-        lhs = unique_ptr_cast<ExprASTNode>(BinaryASTNode(op, std::move(lhs), std::move(rhs), CurTok));
-      } else { // Evaluate lower level expression
-        ResultMonad<ExprASTNode> res = next(std::nullopt);
-        if(res.success()) { lhs = std::move(res).unwrap(); } else { return res; }
+        lhs = unique_ptr_cast<ExprASTNode>(BinaryASTNode(op, std::move(lhs), std::move(rhs), CurTok));    
+
+        // Recursion
+        return prime(std::move(lhs));
       }
 
-      if(std::find(ops.begin(), ops.end(), CurTok.type) != ops.end()) {        
-        ConsumeNoCall(ExprASTNode, rhs, self(std::optional<std::unique_ptr<ExprASTNode>>(std::move(lhs))));
+      // Epsilon
+      return make_result_ptr(std::move(lhs));
+    };
 
-        return std::move(rhs);
-      }
-
-    return make_result_ptr(std::move(lhs));
+  base = [next, ops, prime]() -> ResultMonad<ExprASTNode> {
+    std::cout << "Base: " << CurTok.lexeme << " " << CurTok.lineNo << std::endl;
+    Consume(ExprASTNode, lhs, next);
+    return prime(std::move(lhs));
   };
 
-  return self;
+  return base;
 };
 
 static ParserFunction<ExprASTNode> unary_expr = 
@@ -309,11 +308,7 @@ static ParserFunction<ExprASTNode> unary_expr =
     return parentheses_expr();
   };
 
-auto unary_wrapper = [](std::optional<std::unique_ptr<ExprASTNode>> _p) -> ResultMonad<ExprASTNode> {
-  return unary_expr();
-};
-
-static auto mul_expr = generic_binary_expr(unary_wrapper, {TOKEN_TYPE::ASTERIX, TOKEN_TYPE::DIV, TOKEN_TYPE::MOD});
+static auto mul_expr = generic_binary_expr(unary_expr, {TOKEN_TYPE::ASTERIX, TOKEN_TYPE::DIV, TOKEN_TYPE::MOD});
 
 static auto add_expr = generic_binary_expr(mul_expr, {TOKEN_TYPE::PLUS, TOKEN_TYPE::MINUS});
 
@@ -323,9 +318,8 @@ static auto eq_expr = generic_binary_expr(rel_expr, {TOKEN_TYPE::EQ, TOKEN_TYPE:
 
 static auto and_expr = generic_binary_expr(eq_expr, {TOKEN_TYPE::AND});
 
-static ResultMonad<ExprASTNode> or_expr(std::optional<std::unique_ptr<ExprASTNode>> p) {
-  auto func = generic_binary_expr(and_expr, {TOKEN_TYPE::OR});
-  return func(std::move(p));
+static ResultMonad<ExprASTNode> expr() {
+  return generic_binary_expr(and_expr, {TOKEN_TYPE::OR})();
 }
 
 #pragma endregion
@@ -549,9 +543,7 @@ ResultMonad<std::vector<std::unique_ptr<DeclASTNode>>> decl_list() {
   std::vector<std::unique_ptr<DeclASTNode>> func_decls;
   
   while(isTypeSpecFirst()) {
-    std::cout << "stmt" << std::endl;
     Consume(DeclASTNode, node, decl);
-    std::cout << "stmt2" << std::endl;
 
     func_decls.push_back(std::move(node));
   }
