@@ -75,7 +75,8 @@ int main(int argc, char **argv) {
   auto res = parser();
   if(!res.success()) {
     std::cout << "Parser Error" << std::endl;
-    std::cout << res.error().msg() << std::endl;
+    std::string s(argv[1]);
+    std::cout << res.error()->msg(s) << std::endl;
 
     return 1;
   } else {

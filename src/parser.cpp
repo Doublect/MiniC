@@ -124,7 +124,7 @@ auto type_spec =
       return make_result(std::move(tst));
     }
 
-    return make_result<TypeSpecType>(ErrorT("Expected type specifier, got: "s + std::to_string(CurTok.type), CurTok));
+    return make_result<VariableType>(unique_ptr_cast<ErrorT>(CustomExpectedTokenErrorT("type specifier", CurTok)));
   };
 
 auto var_type = 
@@ -135,7 +135,7 @@ auto var_type =
       return make_result(std::move(type));
     }
 
-    return make_result<VariableType>(ErrorT("Expected variable type, got: "s + std::to_string(CurTok.type)));
+    return make_result<VariableType>(unique_ptr_cast<ErrorT>(CustomExpectedTokenErrorT("variable type", CurTok)));
   };
 
 auto ident =
@@ -148,7 +148,7 @@ auto ident =
     std::string name = CurTok.lexeme;
     getNextToken();
 
-    return make_result<std::string>(ErrorT("Expected identifier, got: "s + std::to_string(CurTok.type), CurTok));
+    return make_result<std::string>(unique_ptr_cast<ErrorT>(CustomExpectedTokenErrorT("identifier", CurTok)));
   };
 
 static auto token_type =
@@ -159,18 +159,12 @@ static auto token_type =
   };
 
 static ResultMonad<TOKEN> expect(TOKEN_TYPE type) {
-  if(CurTok.type != type) {
-    auto str = std::string(std::string("Expected token ") + std::to_string(type) + std::string(" but got ") + std::to_string(CurTok.type));
-    std::cout << str << std::endl;
-    return ResultMonad<TOKEN>(ErrorT(str, lineNo, columnNo));
-    //LogError(std::string(std::string("Expected token ") + std::to_string(type) + std::string(" but got ") + std::to_string(CurTok.type)));
-    //LogError(std::to_string(lineNo) + ":" + std::to_string(columnNo));
-  }
-  //std::cout << "Read token: " << CurTok.type << std::endl;
+  if(CurTok.type != type)
+    return make_result<TOKEN>(unique_ptr_cast<ErrorT>(ExpectedTokenErrorT(type, CurTok)));
+
   TOKEN tok = CurTok;
-  auto a = make_result(std::move(tok));
   getNextToken();
-  return a;
+  return make_result(std::move(tok));
 }
 
 ///-----------------------------------------------------------------------------
@@ -187,18 +181,17 @@ static auto literals =
       return make_result(IntASTNode(CurTok, value));
     } else if(CurTok.type == TOKEN_TYPE::FLOAT_LIT) {
       float value = FloatVal;
-      std::cout << "Read float: " << value << std::endl;
       getNextToken();
 
       return make_result(FloatASTNode(CurTok, value));
-    } else { //if(CurTok.type == TOKEN_TYPE::BOOL_LIT)
+    } else if(CurTok.type == TOKEN_TYPE::BOOL_LIT) {
       bool value = BoolVal;
       getNextToken();
 
       return make_result(BoolASTNode(CurTok, value));
     }
-    std::cout << "Read token: " << CurTok.type << std::endl;
-    return make_result<ExprASTNode>(ErrorT("Expected literal, got: "s + std::to_string(CurTok.type), CurTok));
+
+    return make_result<ExprASTNode>(unique_ptr_cast<ErrorT>(CustomExpectedTokenErrorT("literal", CurTok))); 
   };
 
 static ResultMonad<ExprASTNode> expr();
@@ -225,7 +218,6 @@ static ResultMonad<std::vector<std::unique_ptr<ExprASTNode>>> args() {
 };
 
 static ResultMonad<ExprASTNode> primary_expr() {
-  std::cout << "Primary expr " << (CurTok.type == TOKEN_TYPE::IDENT) << " " << abs(CurTok.lineNo) << std::endl;
   if(CurTok.type == TOKEN_TYPE::IDENT) {
     ConsumeVal(std::string, varName, ident);
 
@@ -252,7 +244,7 @@ static ResultMonad<ExprASTNode> parentheses_expr() {
   return primary_expr();
 };
 
- ResultMonad<ExprASTNode> base_binary(ParserFunction<ExprASTNode> next, ParserFunction<ExprASTNode, std::unique_ptr<ExprASTNode>> prime) {
+ResultMonad<ExprASTNode> base_binary(ParserFunction<ExprASTNode> next, ParserFunction<ExprASTNode, std::unique_ptr<ExprASTNode>> prime) {
   Consume(ExprASTNode, lhs, next);
   return prime(std::move(lhs));
 };
@@ -291,7 +283,6 @@ static ParserFunction<ExprASTNode> unary_expr =
   };
 
 static auto mul_expr_prime(std::unique_ptr<ExprASTNode> p) {
-  std::cout << "Mul expr prime" << std::endl;
   return prime_binary(unary_expr, {TOKEN_TYPE::ASTERIX, TOKEN_TYPE::DIV, TOKEN_TYPE::MOD}, std::move(p));
 };
 
@@ -465,7 +456,6 @@ static ResultMonad<StatementASTNode> stmt() {
     return block();
   } else if(isExprFirst()) {
     Consume(ExprASTNode, stmt, expr);
-    std::cout << "PARSED expr" << std::endl;
     Expect(TOKEN_TYPE::SC);
     return make_result_ptr(std::move(stmt));
   }
