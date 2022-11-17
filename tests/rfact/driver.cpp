@@ -29,5 +29,5 @@ int main() {
     if(rfact(10) == 3628800) 
       std::cout << "PASSED Result: " << rfact(10) << std::endl;
     else 
-      std::cout << "FALIED Result: " << rfact(10) << std::endl;
+      std::cout << "FAILED Result: " << rfact(10) << std::endl;
 }

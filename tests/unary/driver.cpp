@@ -35,7 +35,7 @@ int main() {
   if(essentiallyEqual(unary(y,x),4.0,0.001))
     std::cout << "Result: PASSED" <<std::endl;
   else
-    std::cout << "Result: FALIED" <<std::endl;
+    std::cout << "Result: FAILED" <<std::endl;
   
   
 }

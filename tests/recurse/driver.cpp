@@ -30,6 +30,6 @@ int main() {
   if( result == 210)    
     std::cout << "PASSED Result: " << result << std::endl;
   else 
-    std::cout << "FALIED Result: " << result << std::endl;    
+    std::cout << "FAILED Result: " << result << std::endl;    
   
 }

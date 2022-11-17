@@ -29,5 +29,5 @@ int main() {
     if(factorial(10) == 3628800) 
       std::cout << "PASSED Result: " << factorial(10) << std::endl;
   	else 
-  	  std::cout << "FALIED Result: " << factorial(10) << std::endl;
+  	  std::cout << "FAILED Result: " << factorial(10) << std::endl;
 }

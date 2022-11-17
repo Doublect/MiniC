@@ -2,7 +2,7 @@
 #include <cstdio>
 #include <math.h> 
 
-// clang++ driver.cpp palindrome.ll -o palindrome
+// clang++ driver.cpp cosine.ll -o cosine
 
 #ifdef _WIN32
 #define DLLEXPORT __declspec(dllexport)
@@ -21,18 +21,19 @@ extern "C" DLLEXPORT float print_float(float X) {
 }
 
 extern "C" {
-    bool palindrome(int number);
+    int lazy_and();
+    int lazy_or();
 }
-
 
 int main() {
 
-  float x = 3.14159; // pi
-
-  
-  if(palindrome(12321) && palindrome(45677654) && !palindrome(123786))
-    std::cout << "PASSED Result: " << std::endl;
+  if(lazy_and() == 0) 
+    std::cout << "PASSED Lazy AND" << std::endl;
   else 
-    std::cout << "FAILED Result: " << std::endl;    
-  
+    std::cout << "FAILED Lazy AND" << std::endl;
+
+  if(lazy_or() == 0) 
+    std::cout << "PASSED Lazy OR" << std::endl;
+  else 
+    std::cout << "FAILED Lazy OR" << std::endl;
 }

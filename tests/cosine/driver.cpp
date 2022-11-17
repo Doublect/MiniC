@@ -40,6 +40,6 @@ int main() {
     )  
     std::cout << "PASSED Result: " << std::endl;
   else 
-    std::cout << "FALIED Result: " << std::endl;    
+    std::cout << "FAILED Result: " << std::endl;    
   
 }
