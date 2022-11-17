@@ -31,10 +31,13 @@
 #include "code_gen.hpp"
 
 #include "ast.hpp"
-#include "helpers.hpp"
 #include "code_gen_helpers.hpp"
+#include "errors.hpp"
+#include "helpers.hpp"
 
 #define BuildInt(var, a, b) var != Type::TypeID::FloatTyID ? a(L, R, Name) : b(L, R, Name)
+
+extern std::string fileName;
 
 //===----------------------------------------------------------------------===//
 // Code Generation
@@ -192,10 +195,10 @@ Value *CallExprAST::codegen() {
     Function *Function = TheModule->getFunction(FunctionName);
 
     if(!Function) {
-        SemanticError("Unknown function referenced: " + FunctionName, Tok);
+        ErrorC("Unknown function referenced: " + FunctionName, Tok).msg(fileName);
     }
     if(Function->getFunctionType()->getNumParams() != Args.size()) {
-        SemanticError("Function `" + FunctionName + "` expects `" + std::to_string(Function->getFunctionType()->getNumParams()) + "` arguments, but `" + std::to_string(Args.size()) + "` were provided", Tok);
+        SemanticError("Function `" + FunctionName + "` expects `" + std::to_string(Function->getFunctionType()->getNumParams()) + "` arguments, but `" + std::to_string(Args.size()) + "` were provided", Tok, fileName);
     }
 
     std::vector<Value *> ArgsIR;
@@ -223,7 +226,7 @@ Value *AssignmentASTNode::codegen() {
     Value *Val = RHS->codegen();
 
     if(!Val) {
-        SemanticError("Invalid assignment of expression", Tok);
+        SemanticError("Invalid assignment of expression", Tok, fileName);
     }
 
     auto [Alloca, _] = VariableScope.getVariable(Name);
@@ -237,7 +240,8 @@ Value *AssignmentASTNode::codegen() {
 
 /// BlockASTNode does writes to the parent block, it does not create one by itself
 Value *BlockASTNode::codegen() {
-    VariableScope.pushScope();
+    if(hasScope)
+        VariableScope.pushScope();
 
     std::vector<Value *> declCode;
     for(auto &decl: this->Declarations) {
@@ -249,7 +253,8 @@ Value *BlockASTNode::codegen() {
         stmtCode.push_back(stmt->codegen());
     }
 
-    VariableScope.popScope();
+    if(hasScope)
+        VariableScope.popScope();
     return Builder->GetInsertBlock();
 }
 
@@ -425,14 +430,14 @@ Value *ReturnStmtASTNode::codegen() {
     Function *F = Builder->GetInsertBlock()->getParent();
 
     if(!F) {
-        SemanticError("Return statement outside of function", Tok);
+        SemanticError("Return statement outside of function", Tok, fileName);
     }
 
     // If there is a return value, check if it is the same type as the function (int, bool, float)
     // If there is no return value, check if the function is void
     if((!RetVal && Type::getVoidTy(*TheContext) != F->getReturnType()) || (RetVal && RetVal->getType() != F->getReturnType())) {
         std::string retValName = RetVal ? type_to_string(RetVal->getType()) : "void";
-        SemanticError("Cannot return value of type `" + retValName + "` in function returning type `" + type_to_string(F->getReturnType()) + "`.", Tok);
+        SemanticError("Cannot return value of type `" + retValName + "` in function returning type `" + type_to_string(F->getReturnType()) + "`.", Tok, fileName);
     }
 
     Builder->CreateRet(RetVal);
@@ -449,7 +454,7 @@ Value *ReturnStmtASTNode::codegen() {
 Value *VariableDeclASTNode::codegen() {
     if(Builder->GetInsertBlock() == nullptr) {
         if(VariableScope.isGlobalVariableDeclared(Name)) {
-            SemanticError("Variable `" + Name + "` has already been declared.", Tok);
+            SemanticError("Variable `" + Name + "` has already been declared.", Tok, fileName);
         }
 
         Constant *consta = Type == VariableType::FLOAT ? (Constant *)ConstantFP::get(*TheContext, APFloat(0.0f)) : (Constant *)ConstantInt::get(*TheContext, APInt(32, 0, true));
@@ -482,7 +487,7 @@ Value *FunctionDeclASTNode::codegen() {
     FunctionType *FT = FunctionType::get(GetType(ReturnType), ArgsTypes, false);
 
     if(TheModule->getFunction(Name)) {
-        throw SemanticError("Function `" + Name + "` previously declared", this->Tok);
+        throw SemanticError("Function `" + Name + "` previously declared", this->Tok, fileName);
     }
 
     Function *F = Function::Create(FT, Function::ExternalLinkage, Name, TheModule.get());
@@ -530,7 +535,7 @@ Value *FunctionDeclASTNode::codegen() {
     
     // Ensure the function is valid
     if(verifyFunction(*F, &llvm::errs())) {
-        throw SemanticError("Function `" + Name + "` is invalid. See error output.", this->Tok);
+        throw SemanticError("Function `" + Name + "` is invalid. See error output.", this->Tok, fileName);
     }
 
 

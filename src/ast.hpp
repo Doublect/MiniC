@@ -327,6 +327,8 @@ public:
   BlockASTNode(std::vector<std::unique_ptr<DeclASTNode>> &&declarations,
     std::vector<std::unique_ptr<StatementASTNode>> &&statements, TOKEN tok, bool hasScope) 
     : Declarations(std::move(declarations)), Statements(std::move(statements)), Tok(tok), hasScope(hasScope) {}
+
+  void setHasScope(bool hasScope) { this->hasScope = hasScope; }
   Value *codegen() override;
   std::shared_ptr<ASTPrint> to_ast_print() override
   {
@@ -359,7 +361,6 @@ public:
       make_ast_labelled("Cond:", Cond->to_ast_print()),
       make_ast_labelled("Then:", Then->to_ast_print())
     };
-    //TODO: recheck brevity
 
     if(Else)
       children.push_back(make_ast_labelled("Else:", Else->to_ast_print()));

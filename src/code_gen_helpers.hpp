@@ -71,7 +71,8 @@
         }
     };
 
-    // The lifetime of caster is the same as the lifetime of the builder.
+    // Responsible for finding and casting to the correct type
+    // The lifetime of caster is the same as the lifetime of the builder, therefore we can store a shared_ptr to it.
     class VariableCastManager {
         std::shared_ptr<IRBuilder<>> Builder;
         std::shared_ptr<LLVMContext> TheContext;
@@ -142,44 +143,6 @@
 
             return Builder->CreateICmpNE(L, ConstantInt::get(*TheContext, APInt(32, 0, true)), "int32_to_bool");
         }
-    };
-
-    class SemanticProblem {
-        std::string msg;
-        int LineNo, ColumnNo;
-
-    public:
-        SemanticProblem(std::string msg, int LineNo, int ColumnNo) : msg(msg), LineNo(LineNo), ColumnNo(ColumnNo) {
-            print();
-        }
-        SemanticProblem(std::string msg, TOKEN tok) : msg(msg), LineNo(tok.lineNo), ColumnNo(tok.columnNo) {
-            print();
-        }
-
-        virtual void print() {
-            std::cout << "Semantic error at line " << LineNo << ", column " << ColumnNo << ": " << msg << std::endl;
-        }
-    };
-
-
-    class SemanticError {
-        SemanticProblem *problem;
-
-    public:
-        SemanticError(std::string msg, int LineNo, int ColumnNo) : problem(new SemanticProblem(msg, LineNo, ColumnNo)) {
-            exit(1);
-        }
-        SemanticError(std::string msg, TOKEN tok) : problem(new SemanticProblem(msg, tok)) {
-            exit(1);
-        }
-    };
-
-    class SemanticWarning {
-        SemanticProblem *problem;
-
-    public:
-        SemanticWarning(std::string msg, int LineNo, int ColumnNo) : problem(new SemanticProblem(msg, LineNo, ColumnNo)) {}
-        SemanticWarning(std::string msg, TOKEN tok) : problem(new SemanticProblem(msg, tok)) {}
     };
 
     constexpr std::string type_to_string(Type *type) {

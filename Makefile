@@ -6,7 +6,7 @@ CFLAGS= -g `llvm-config --cppflags --ldflags --system-libs --libs all` \
 SRCF = src
 BUILDF = build
 DEPS = $(BUILDF)/ast.o $(BUILDF)/ast_print.o $(BUILDF)/code_gen.o $(BUILDF)/code_gen_helpers.o\
- $(BUILDF)/helpers.o $(BUILDF)/lexer.o $(BUILDF)/parser.o
+ $(BUILDF)/errors.o $(BUILDF)/helpers.o $(BUILDF)/lexer.o $(BUILDF)/parser.o
 
 mccomp: $(SRCF)/mccomp.cpp $(DEPS)
 	$(CXX) $^ $(CFLAGS) -o mccomp

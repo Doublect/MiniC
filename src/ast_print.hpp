@@ -47,7 +47,7 @@ public:
     std::string name,
     std::vector<std::shared_ptr<ASTPrint>> &&children) : name(name), children(std::move(children)) {}
 
-  virtual void printAST(std::string indent, bool last = false)
+  virtual void printAST(std::string indent = "", bool last = false)
   {
     std::cout << indent << (last ? "└─" : "├─") << name << std::endl;
 
@@ -74,7 +74,7 @@ public:
     std::string name,
     std::shared_ptr<ASTPrint> &&child) : name(name), child(std::move(child)) {}
 
-  virtual void printAST(std::string indent, bool last = false)
+  virtual void printAST(std::string indent = "", bool last = false)
   {
     std::cout << indent << (last ? "└─" : "├─") << name << std::endl;
 
@@ -92,7 +92,7 @@ class ASTPrintLeaf : public ASTPrint
 public:
   ASTPrintLeaf(std::string name) : name(name) {}
 
-  virtual void printAST(std::string indent, bool last = false) 
+  virtual void printAST(std::string indent = "", bool last = false) 
   {
     std::cout << indent << (last ? "└─" : "├─") << name << std::endl;
   }

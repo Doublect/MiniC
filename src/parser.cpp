@@ -3,10 +3,10 @@
 #include<optional>
 
 #include "ast.hpp"
-#include "parser.hpp"
-
+#include "errors.hpp"
 #include "helpers.hpp"
 #include "lexer.hpp"
+#include "parser.hpp"
 
 FILE *pFile;
 
@@ -490,50 +490,47 @@ static ResultMonad<StatementASTNode> stmt() {
 #pragma endregion
 
 
-static ParserFunction<FunctionParameterASTNode> param_decl =
-  []() -> ResultMonad<FunctionParameterASTNode> { 
-    ConsumeVal(VariableType, type, var_type);
-    ConsumeVal(std::string, value, ident);
+static ResultMonad<FunctionParameterASTNode> param_decl() { 
+  ConsumeVal(VariableType, type, var_type);
+  ConsumeVal(std::string, value, ident);
 
-    return make_result(FunctionParameterASTNode(CurTok, value, type));
-  };
+  return make_result(FunctionParameterASTNode(CurTok, value, type));
+};
 
-static ParserFunction<std::vector<std::unique_ptr<FunctionParameterASTNode>>> func_params =
-  []() -> ResultMonad<std::vector<std::unique_ptr<FunctionParameterASTNode>>> {
-    std::vector<std::unique_ptr<FunctionParameterASTNode>> params;
+static ResultMonad<std::vector<std::unique_ptr<FunctionParameterASTNode>>> func_params() {
+  std::vector<std::unique_ptr<FunctionParameterASTNode>> params;
 
-    if(CurTok.type == TOKEN_TYPE::VOID_TOK) {
+  if(CurTok.type == TOKEN_TYPE::VOID_TOK) {
+    getNextToken();
+    return make_result(std::move(params));
+  }
+
+  if(isVarTypeFirst()) {
+    Consume(FunctionParameterASTNode, param, param_decl);
+    params.push_back(std::move(param));
+
+    while(CurTok.type == TOKEN_TYPE::COMMA) {
       getNextToken();
-      return make_result(std::move(params));
-    }
-
-    if(isVarTypeFirst()) {
       Consume(FunctionParameterASTNode, param, param_decl);
       params.push_back(std::move(param));
-
-      while(CurTok.type == TOKEN_TYPE::COMMA) {
-        getNextToken();
-        Consume(FunctionParameterASTNode, param, param_decl);
-        params.push_back(std::move(param));
-      }
     }
+  }
 
-    return make_result(std::move(params));
-  };
+  return make_result(std::move(params));
+};
 
-static ParserFunction<ExternFunctionDeclASTNode> extern_decl = 
-  []() -> ResultMonad<ExternFunctionDeclASTNode> {
-    TOKEN startTok = CurTok;
-    Expect(TOKEN_TYPE::EXTERN);
-    ConsumeVal(TypeSpecType, type, type_spec);
-    ConsumeVal(std::string, name, ident);
-    Expect(TOKEN_TYPE::LPAR);
-    Consume(std::vector<std::unique_ptr<FunctionParameterASTNode>>, params, func_params);
-    Expect(TOKEN_TYPE::RPAR);
-    Expect(TOKEN_TYPE::SC); 
+static ResultMonad<ExternFunctionDeclASTNode> extern_decl() {
+  TOKEN startTok = CurTok;
+  Expect(TOKEN_TYPE::EXTERN);
+  ConsumeVal(TypeSpecType, type, type_spec);
+  ConsumeVal(std::string, name, ident);
+  Expect(TOKEN_TYPE::LPAR);
+  Consume(std::vector<std::unique_ptr<FunctionParameterASTNode>>, params, func_params);
+  Expect(TOKEN_TYPE::RPAR);
+  Expect(TOKEN_TYPE::SC); 
 
-    return make_result(ExternFunctionDeclASTNode(name, std::move(*params.release()), type, startTok));
-  };
+  return make_result(ExternFunctionDeclASTNode(name, std::move(*params.release()), type, startTok));
+};
 
 
 static ResultMonad<std::vector<std::unique_ptr<ExternFunctionDeclASTNode>>> extern_list() { 
@@ -547,39 +544,41 @@ static ResultMonad<std::vector<std::unique_ptr<ExternFunctionDeclASTNode>>> exte
   return make_result(std::move(func_decls));
 }
 
-static ParserFunction<DeclASTNode> decl =
- []() -> ResultMonad<DeclASTNode> {
-    std::string name;
-    TypeSpecType type;
-    TOKEN startTok = CurTok;
+static ResultMonad<DeclASTNode> decl() {
+  std::string name;
+  TypeSpecType type;
+  TOKEN startTok = CurTok;
 
-    if(CurTok.type == TOKEN_TYPE::VOID_TOK) {
-      type = TypeSpecType::VOID;
-      getNextToken();
-      ConsumeAssignVal(std::string, name, ident);
-    } else {
-      { 
-        ResultMonad<VariableType> res = var_type(); \
-        if(res.success()) { type = (TypeSpecType)*std::move(res).unwrap_val(); } else { return res; }
-      }
-
-      ConsumeAssignVal(std::string, name, ident);
-
-      if(CurTok.type == TOKEN_TYPE::SC) {
-        Expect(TOKEN_TYPE::SC);
-  
-        auto a = make_result(VariableDeclASTNode(CurTok, name, (VariableType) type));
-        return a;
-      }
+  if(CurTok.type == TOKEN_TYPE::VOID_TOK) {
+    type = TypeSpecType::VOID;
+    getNextToken();
+    ConsumeAssignVal(std::string, name, ident);
+  } else {
+    { 
+      ResultMonad<VariableType> res = var_type(); \
+      if(res.success()) { type = (TypeSpecType)*std::move(res).unwrap_val(); } else { return res; }
     }
-    Expect(TOKEN_TYPE::LPAR);
-    Consume(std::vector<std::unique_ptr<FunctionParameterASTNode>>, params, func_params);
-    Expect(TOKEN_TYPE::RPAR);
 
-    Consume(BlockASTNode, node, block);
+    ConsumeAssignVal(std::string, name, ident);
 
-    return make_result(FunctionDeclASTNode(name, std::move(*params.release()), std::move(node), type, startTok));
-  };
+    if(CurTok.type == TOKEN_TYPE::SC) {
+      Expect(TOKEN_TYPE::SC);
+
+      auto a = make_result(VariableDeclASTNode(CurTok, name, (VariableType) type));
+      return a;
+    }
+  }
+  Expect(TOKEN_TYPE::LPAR);
+  Consume(std::vector<std::unique_ptr<FunctionParameterASTNode>>, params, func_params);
+  Expect(TOKEN_TYPE::RPAR);
+
+  Consume(BlockASTNode, node, block);
+
+  // Let the function decl node create the scope for the function
+  node->setHasScope(false);
+  
+  return make_result(FunctionDeclASTNode(name, std::move(*params.release()), std::move(node), type, startTok));
+};
 
 ResultMonad<std::vector<std::unique_ptr<DeclASTNode>>> decl_list() {
   std::vector<std::unique_ptr<DeclASTNode>> func_decls;

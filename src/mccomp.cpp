@@ -29,6 +29,7 @@ extern std::unique_ptr<IRBuilder<>> Builder;
 extern std::unique_ptr<Module> TheModule;
 
 extern int lineNo, columnNo;
+std::string fileName; 
 
 //===----------------------------------------------------------------------===//
 // AST Printer
@@ -71,18 +72,21 @@ int main(int argc, char **argv) {
   // Make the module, which holds all the code.
 
   std::cout << "Parsing...\n";
+
+  std::string s(argv[1]);
+  fileName = s;
+
   // Run the parser now.
   auto res = parser();
   if(!res.success()) {
     std::cout << "Parser Error" << std::endl;
-    std::string s(argv[1]);
     std::cout << res.error()->msg(s) << std::endl;
 
     return 1;
   } else {
     std::cout << res.success() << std::endl;
     std::cout << "Successful Parsing" << std::endl;
-    auto AST = std::move(res).unwrap();
+    std::unique_ptr<ProgramASTNode> AST = std::move(res).unwrap();
     
     AST->to_ast_print()->printAST("", true);
 
