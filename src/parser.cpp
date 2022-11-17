@@ -116,8 +116,7 @@ static bool isStmtFirst() {
 //   return nullptr;
 // }
 
-auto type_spec = 
-  []() -> ResultMonad<TypeSpecType> {
+ResultMonad<TypeSpecType> type_spec() {
     if(isTypeSpecFirst()) {
       TypeSpecType tst = (TypeSpecType) CurTok.type;
       getNextToken();
@@ -127,8 +126,7 @@ auto type_spec =
     return make_result<VariableType>(unique_ptr_cast<ErrorT>(CustomExpectedTokenErrorT("type specifier", CurTok)));
   };
 
-auto var_type = 
-  []() -> ResultMonad<VariableType>{
+ResultMonad<VariableType> var_type() {
     if(isVarTypeFirst()) {
       VariableType type = (VariableType) CurTok.type;
       getNextToken();
@@ -138,8 +136,7 @@ auto var_type =
     return make_result<VariableType>(unique_ptr_cast<ErrorT>(CustomExpectedTokenErrorT("variable type", CurTok)));
   };
 
-auto ident =
-  []() -> ResultMonad<std::string> {
+static ResultMonad<std::string> ident() {
     if(CurTok.type == TOKEN_TYPE::IDENT) {
       std::string name = CurTok.lexeme;
       getNextToken();
@@ -151,12 +148,11 @@ auto ident =
     return make_result<std::string>(unique_ptr_cast<ErrorT>(CustomExpectedTokenErrorT("identifier", CurTok)));
   };
 
-static auto token_type =
-  [](){
-    TOKEN_TYPE tp = (TOKEN_TYPE) CurTok.type;
-    getNextToken();
-    return make_result(std::move(tp));
-  };
+static auto token_type() {
+  TOKEN_TYPE tp = (TOKEN_TYPE) CurTok.type;
+  getNextToken();
+  return make_result(std::move(tp));
+};
 
 static ResultMonad<TOKEN> expect(TOKEN_TYPE type) {
   if(CurTok.type != type)
@@ -172,8 +168,7 @@ static ResultMonad<TOKEN> expect(TOKEN_TYPE type) {
 ///-----------------------------------------------------------------------------
 #pragma region Expression Parsing
 
-static auto literals =
-  []() -> ResultMonad<ExprASTNode> {
+static ResultMonad<ExprASTNode> literals() {
     if(CurTok.type == TOKEN_TYPE::INT_LIT) {
       int value = IntVal;
       getNextToken();
@@ -314,16 +309,46 @@ static auto eq_expr() {
   return base_binary(rel_expr, eq_expr_prime);
 }
 
-static auto and_expr_prime(std::unique_ptr<ExprASTNode> p) {
-  return prime_binary(eq_expr, {TOKEN_TYPE::AND}, std::move(p));
+static ResultMonad<ExprASTNode> and_expr_prime(std::unique_ptr<ExprASTNode> p) {
+  std::unique_ptr<ExprASTNode> lhs = std::move(p);
+
+  if(CurTok.type == TOKEN_TYPE::AND) {
+    TOKEN startTok = CurTok;
+    ConsumeVal(TOKEN_TYPE, op, token_type);
+    // Evaluate lower expression
+    Consume(ExprASTNode, rhs, eq_expr);
+
+    lhs = unique_ptr_cast<ExprASTNode>(LazyAndASTNode(std::move(lhs), std::move(rhs), startTok));    
+
+    // Recursion
+    return and_expr_prime(std::move(lhs));
+  }
+
+  // Epsilon
+  return make_result_ptr(std::move(lhs));
 }
 
 static auto and_expr() {
   return base_binary(eq_expr, and_expr_prime);
 }
 
-static auto or_prime(std::unique_ptr<ExprASTNode> p) {
-  return prime_binary(and_expr, {TOKEN_TYPE::OR}, std::move(p));
+static ResultMonad<ExprASTNode> or_prime(std::unique_ptr<ExprASTNode> p) {
+  std::unique_ptr<ExprASTNode> lhs = std::move(p);
+
+  if(CurTok.type == TOKEN_TYPE::OR) {
+    TOKEN startTok = CurTok;
+    ConsumeVal(TOKEN_TYPE, op, token_type);
+    // Evaluate lower expression
+    Consume(ExprASTNode, rhs, and_expr);
+
+    lhs = unique_ptr_cast<ExprASTNode>(LazyOrASTNode(std::move(lhs), std::move(rhs), startTok));    
+
+    // Recursion
+    return or_prime(std::move(lhs));
+  }
+
+  // Epsilon
+  return make_result_ptr(std::move(lhs));
 }
 
 static auto or_expr() {

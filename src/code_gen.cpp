@@ -276,9 +276,7 @@ Value *IfElseASTNode::codegen() {
     BasicBlock *AfterBB = BasicBlock::Create(*TheContext, "after");
 
     // Jump to respective block, depending on condition
-    if(!Builder->GetInsertBlock()->getTerminator()) {
-        Builder->CreateCondBr(CondV, ThenBB, ElseBB);
-    }
+    Builder->CreateCondBr(CondV, ThenBB, ElseBB);
 
     // Then value
     Builder->SetInsertPoint(ThenBB);
@@ -308,6 +306,74 @@ Value *IfElseASTNode::codegen() {
     Builder->SetInsertPoint(AfterBB);
 
     return TheFunction;
+}
+
+Value *LazyOrASTNode::codegen() {
+    Function *TheFunction = Builder->GetInsertBlock()->getParent();
+
+    BasicBlock *LeftBB =
+        BasicBlock::Create(*TheContext, "left", TheFunction);
+    BasicBlock *RightBB = BasicBlock::Create(*TheContext, "right");
+    BasicBlock *AfterBB = BasicBlock::Create(*TheContext, "orcont");
+
+    Builder->CreateBr(LeftBB);
+    Builder->SetInsertPoint(LeftBB);
+    Value *Left = LHS->codegen();
+
+    if(!Left) {
+        return nullptr;
+    }
+
+    Left = addConditionComparison(Left);
+    Builder->CreateCondBr(Left, AfterBB, RightBB);
+
+    TheFunction->getBasicBlockList().push_back(RightBB);
+    Builder->SetInsertPoint(RightBB);
+    Value *Right = RHS->codegen();
+
+    if(!Right) {
+        return nullptr;
+    }
+
+    Builder->CreateBr(AfterBB);
+    TheFunction->getBasicBlockList().push_back(AfterBB);
+    Builder->SetInsertPoint(AfterBB);
+
+    return Right;
+}
+
+Value *LazyAndASTNode::codegen() {
+    Function *TheFunction = Builder->GetInsertBlock()->getParent();
+
+    BasicBlock *LeftBB =
+        BasicBlock::Create(*TheContext, "left", TheFunction);
+    BasicBlock *RightBB = BasicBlock::Create(*TheContext, "right");
+    BasicBlock *AfterBB = BasicBlock::Create(*TheContext, "andcont");
+
+    Builder->CreateBr(LeftBB);
+    Builder->SetInsertPoint(LeftBB);
+    Value *Left = LHS->codegen();
+
+    if(!Left) {
+        return nullptr;
+    }
+
+    Left = addConditionComparison(Left);
+    Builder->CreateCondBr(Left, RightBB, AfterBB);
+
+    TheFunction->getBasicBlockList().push_back(RightBB);
+    Builder->SetInsertPoint(RightBB);
+    Value *Right = RHS->codegen();
+
+    if(!Right) {
+        return nullptr;
+    }
+
+    Builder->CreateBr(AfterBB);
+    TheFunction->getBasicBlockList().push_back(AfterBB);
+    Builder->SetInsertPoint(AfterBB);
+
+    return Right;
 }
 
 Value *WhileASTNode::codegen() {

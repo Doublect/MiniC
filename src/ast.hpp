@@ -184,16 +184,52 @@ public:
 /// AST representation of a binary expression
 class BinaryASTNode : public ExprASTNode
 {
+protected:
   TOKEN_TYPE Op;
   std::unique_ptr<ExprASTNode> LHS, RHS;
 
   TOKEN Tok;
-  std::string Name;
 
 public:
   BinaryASTNode(TOKEN_TYPE op, std::unique_ptr<ExprASTNode> LHS,
                 std::unique_ptr<ExprASTNode> RHS, TOKEN tok)
       : Op(op), LHS(std::move(LHS)), RHS(std::move(RHS)), Tok(tok) {}
+  Value *codegen() override;
+
+  std::shared_ptr<ASTPrint> to_ast_print() override
+  {
+    return make_ast_print(
+        "BinaryASTNode",
+        "Op: " + Tok.lexeme,
+        {LHS->to_ast_print(), RHS->to_ast_print()}
+    );        
+  };
+};
+
+class LazyOrASTNode : public BinaryASTNode
+{
+public:
+  LazyOrASTNode(std::unique_ptr<ExprASTNode> LHS,
+                std::unique_ptr<ExprASTNode> RHS, TOKEN tok)
+      : BinaryASTNode(TOKEN_TYPE::OR, std::move(LHS), std::move(RHS), tok) {}
+  Value *codegen() override;
+
+  std::shared_ptr<ASTPrint> to_ast_print() override
+  {
+    return make_ast_print(
+        "BinaryASTNode",
+        "Op: " + Tok.lexeme,
+        {LHS->to_ast_print(), RHS->to_ast_print()}
+    );        
+  };
+};
+
+class LazyAndASTNode : public BinaryASTNode
+{
+public:
+  LazyAndASTNode(std::unique_ptr<ExprASTNode> LHS,
+                std::unique_ptr<ExprASTNode> RHS, TOKEN tok)
+      : BinaryASTNode(TOKEN_TYPE::AND, std::move(LHS), std::move(RHS), tok) {}
   Value *codegen() override;
 
   std::shared_ptr<ASTPrint> to_ast_print() override
@@ -282,11 +318,15 @@ class BlockASTNode : public StatementASTNode
   std::vector<std::unique_ptr<DeclASTNode>> Declarations;
   std::vector<std::unique_ptr<StatementASTNode>> Statements;
   TOKEN Tok;
+  bool hasScope = true;
 
 public:
   BlockASTNode(std::vector<std::unique_ptr<DeclASTNode>> &&declarations,
     std::vector<std::unique_ptr<StatementASTNode>> &&statements, TOKEN tok) 
     : Declarations(std::move(declarations)), Statements(std::move(statements)), Tok(tok) {}
+  BlockASTNode(std::vector<std::unique_ptr<DeclASTNode>> &&declarations,
+    std::vector<std::unique_ptr<StatementASTNode>> &&statements, TOKEN tok, bool hasScope) 
+    : Declarations(std::move(declarations)), Statements(std::move(statements)), Tok(tok), hasScope(hasScope) {}
   Value *codegen() override;
   std::shared_ptr<ASTPrint> to_ast_print() override
   {
