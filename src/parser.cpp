@@ -498,7 +498,7 @@ static ResultMonad<StatementASTNode> stmt() {
     return make_result_ptr(std::move(stmt));
   }
 
-  return make_result<StatementASTNode>(ErrorT("One of: 'if', 'while', 'return', 'block' or an expression was expected", CurTok));
+  return make_result<StatementASTNode>(CustomExpectedTokenErrorT("if`, `while`, `return`, `block` or `expression statement", CurTok));
 }
 #pragma endregion
 
@@ -614,6 +614,21 @@ ResultMonad<ProgramASTNode> parser() {
 
   Consume(std::vector<std::unique_ptr<ExternFunctionDeclASTNode>>, extern_func_decls, extern_list);
   Consume(std::vector<std::unique_ptr<DeclASTNode>>, decls, decl_list);
+
+  // No declarations or externs parsed
+  if(decls->size() == 0 && extern_func_decls->size() == 0 && CurTok.type != TOKEN_TYPE::EOF_TOK) {
+    return make_result<ProgramASTNode>(unique_ptr_cast<ErrorT>(CustomExpectedTokenErrorT("extern` or `type specifier", CurTok)));
+  }
+
+  // An extern found after a declaration
+  if(decls->size() > 0 && CurTok.type == TOKEN_TYPE::EXTERN) {
+    return make_result<ProgramASTNode>(unique_ptr_cast<ErrorT>(ErrorC("Extern function declaration after declaration.", CurTok)));
+  }
+
+  // The file was not completely parsed
+  if(CurTok.type != TOKEN_TYPE::EOF_TOK) {
+    return make_result<ProgramASTNode>(unique_ptr_cast<ErrorT>(CustomExpectedTokenErrorT("end of file", CurTok)));
+  }
 
   return make_result(ProgramASTNode(std::move(*extern_func_decls.release()), std::move(*decls.release())));
 }

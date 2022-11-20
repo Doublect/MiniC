@@ -7,7 +7,7 @@
 
     #include "lexer.hpp"
 
-    const std::map<TOKEN_TYPE, std::string> token_type_to_string{
+    const std::map<TOKEN_TYPE, std::string> token_type_to_string {
         {TOKEN_TYPE::IDENT, "identifier"},
         {TOKEN_TYPE::ASSIGN, "="},
         {TOKEN_TYPE::LBRA, "{"},
@@ -57,10 +57,19 @@
         {TOKEN_TYPE::INVALID, "<invalid token>"},
     };
 
+    inline std::string tokenTypeToString(int tokenType) {
+        if(token_type_to_string.contains((TOKEN_TYPE)tokenType)) {
+            return token_type_to_string.at((TOKEN_TYPE)tokenType);
+        }
+
+        return  "<unknown token>";
+    }
+
     class ErrorT {
         protected:
             std::string message;
             int lineNo, columnNo;
+            std::string lexeme;
 
             std::string padding(int n) {
                 std::string s = "";
@@ -81,12 +90,24 @@
                 return contents;
             }
 
-            std::string pointer(int column) const {
+            std::string pointer(int column, int length) const {
                 std::string pointer;
                 for (int i = 1; i < column; i++) {
                     pointer += " ";
                 }
-                pointer += "^\n";
+
+                if(length > 0) {
+                    // Limit the number of pointers
+                    length = std::min(length, 128);
+
+                    for (int i = 0; i < length; i++) {
+                        pointer += "^";
+                    }
+                } else {
+                    pointer += "^";
+                }
+                
+                pointer += "\n";
                 return pointer;
             }
 
@@ -98,8 +119,9 @@
                 return "\033[1;33mwarning:\033[0m " + msg;
             }
 
-            ErrorT(TOKEN tok) : lineNo(tok.lineNo), columnNo(tok.columnNo) {}
-            ErrorT(int line, int col) : lineNo(line), columnNo(col) {}
+            ErrorT(TOKEN tok) : lineNo(tok.lineNo), columnNo(tok.columnNo), lexeme(tok.lexeme) {}
+            ErrorT(int line, int col, std::string lexeme = "") : lineNo(line), columnNo(col), lexeme(lexeme) {}
+
         public:
             ErrorT() : message("") {}
             ErrorT(std::string msg): message(msg) {}
@@ -125,7 +147,8 @@
 
             virtual std::string code_highlight(const std::string& filename) {
                 if(lineNo) {
-                    return padding(4) + file_line(filename, lineNo) + "\n" + padding(4) + pointer(columnNo);
+                    return padding(4) + file_line(filename, lineNo) + "\n" + padding(4) + "\033[1;34m" +
+                    pointer(columnNo, lexeme.length()) + "\033[0m";
                 }
 
                 return "";
@@ -158,7 +181,7 @@
         public:
             ExpectedTokenErrorT(TOKEN_TYPE expected, const TOKEN& got) 
                 : expected(expected), got(got), 
-                    ErrorC("Expected `" + token_type_to_string.at(expected) + "`, got " + token_type_to_string.at((TOKEN_TYPE)got.type), got) {}
+                    ErrorC("Expected `" + tokenTypeToString(expected) + "`, got " + tokenTypeToString(got.type), got) {}
     };
 
     class CustomExpectedTokenErrorT : public ErrorC {
@@ -168,7 +191,7 @@
         public:
             CustomExpectedTokenErrorT(std::string s, const TOKEN& got) 
                 : type(s), got(got), 
-                    ErrorC("Expected `" + s + "`, got " + token_type_to_string.at((TOKEN_TYPE)got.type), got) {}
+                    ErrorC("Expected `" + s + "`, got " + tokenTypeToString(got.type), got) {}
     };
 
     class SemanticError : public ErrorC {
