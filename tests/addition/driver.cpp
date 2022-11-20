@@ -27,5 +27,5 @@ int main() {
     if(addition(6, 3) == 9) 
       std::cout << "PASSED Result: " << addition(6, 3) << std::endl;
   	else 
-  	  std::cout << "FALIED Result: " << addition(6, 3) << std::endl;
+  	  std::cout << "FAILED Result: " << addition(6, 3) << std::endl;
 }

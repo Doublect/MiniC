@@ -329,6 +329,8 @@ Value *LazyOrASTNode::codegen() {
         return nullptr;
     }
 
+    BasicBlock *LeftReturnBB = Builder->GetInsertBlock();
+
     Left = addConditionComparison(Left);
     Builder->CreateCondBr(Left, AfterBB, RightBB);
 
@@ -340,11 +342,18 @@ Value *LazyOrASTNode::codegen() {
         return nullptr;
     }
 
+    BasicBlock *RightReturnBB = Builder->GetInsertBlock();
+
     Builder->CreateBr(AfterBB);
     TheFunction->getBasicBlockList().push_back(AfterBB);
     Builder->SetInsertPoint(AfterBB);
 
-    return Right;
+    PHINode *PN = Builder->CreatePHI(Type::getInt32Ty(*TheContext), 2, "orres");
+
+    PN->addIncoming(ConstantInt::get(*TheContext, APInt(32, 1, true)), LeftReturnBB);
+    PN->addIncoming(Right, RightReturnBB);
+
+    return PN;
 }
 
 Value *LazyAndASTNode::codegen() {
@@ -363,6 +372,8 @@ Value *LazyAndASTNode::codegen() {
         return nullptr;
     }
 
+    BasicBlock *LeftReturnBB = Builder->GetInsertBlock();
+
     Left = addConditionComparison(Left);
     Builder->CreateCondBr(Left, RightBB, AfterBB);
 
@@ -374,11 +385,17 @@ Value *LazyAndASTNode::codegen() {
         return nullptr;
     }
 
+    BasicBlock *RightReturnBB = Builder->GetInsertBlock();
     Builder->CreateBr(AfterBB);
     TheFunction->getBasicBlockList().push_back(AfterBB);
     Builder->SetInsertPoint(AfterBB);
 
-    return Right;
+    PHINode *PN = Builder->CreatePHI(Type::getInt32Ty(*TheContext), 2, "andres");
+
+    PN->addIncoming(ConstantInt::get(*TheContext, APInt(32, 0, true)), LeftReturnBB);
+    PN->addIncoming(Right, RightReturnBB);
+
+    return PN;
 }
 
 Value *WhileASTNode::codegen() {
@@ -532,6 +549,8 @@ Value *FunctionDeclASTNode::codegen() {
     VariableScope.popScope();
 
     EliminateUnreachableBlocks(*F);
+    
+    TheModule->print(errs(), nullptr); // print IR to terminal
     
     // Ensure the function is valid
     if(verifyFunction(*F, &llvm::errs())) {

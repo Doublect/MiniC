@@ -1,3 +1,17 @@
 build/
 mccomp
 .cache/
+
+*.ll
+tests/recurse/recurse
+tests/rfact/rfact
+tests/scope/scope
+tests/unary/unary
+tests/void/void
+tests/while/while
+tests/palindrome/palindrome
+tests/pi/pi
+tests/cosine/cosine
+tests/factorial/fact
+tests/fibonacci/fib
+tests/addition/add

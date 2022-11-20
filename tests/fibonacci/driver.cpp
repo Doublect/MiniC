@@ -28,7 +28,7 @@ int main() {
 	if(fibonacci(10) == 88) 
       std::cout << "PASSED Result: " << fibonacci(10) << std::endl;
   	else 
-  	  std::cout << "FALIED Result: " << fibonacci(10) << std::endl;
+  	  std::cout << "FAILED Result: " << fibonacci(10) << std::endl;
 
     
 }
