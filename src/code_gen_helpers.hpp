@@ -8,14 +8,18 @@
 
     #include<map>
     #include<memory>
+    #include<optional>
     #include<ostream>
     #include<stack>
     #include<set>
     #include<tuple>
 
+    #include "errors.hpp"
     #include "helpers.hpp"
 
     using namespace llvm;
+
+    extern std::string fileName;
 
     class VariableScopeManager {
         std::map<std::string, GlobalVariable *> GlobalVariables;
@@ -42,28 +46,38 @@
             ScopeStack.pop();
         }
 
-        void addVariable(const std::string &Name, AllocaInst *Alloca) {
+        bool addVariable(const std::string &Name, AllocaInst *Alloca) {
+            if(ScopeStack.top().contains(Name)) {
+                return false;
+            }
+
             NamedValues[Name].push(Alloca);
             ScopeStack.top().insert(Name);
+
+            return true;
         }
 
-        void addVariable(const std::string &Name, GlobalVariable *Global) {
-            //TODO: redecl?
+        bool addVariable(const std::string &Name, GlobalVariable *Global) {
+            if(GlobalVariables.contains(Name)) {
+                return false;
+            }
+
             GlobalVariables[Name] = Global;
+            return true;
         }
 
-        std::tuple<Value *, Type *>getVariable(const std::string &Name) {
+        std::optional<std::tuple<Value *, Type *>>getVariable(const std::string &Name) {
             print_a_debug("Searching for variable: " + Name);
 
             if(NamedValues.contains(Name) && NamedValues[Name].size() > 0) {
-                return std::make_tuple(NamedValues[Name].top(), NamedValues[Name].top()->getAllocatedType());
+                return std::make_optional(std::make_tuple(NamedValues[Name].top(), NamedValues[Name].top()->getAllocatedType()));
             }
 
             if(GlobalVariables.contains(Name)) {
-                return std::make_tuple(GlobalVariables[Name], GlobalVariables[Name]->getValueType());
+                return std::make_optional(std::make_tuple(GlobalVariables[Name], GlobalVariables[Name]->getValueType()));
             }
             // TODO: Error
-            throw std::runtime_error("Variable not found: " + Name);
+            return std::nullopt;
         }
 
         bool isGlobalVariableDeclared(const std::string &Name) {
@@ -90,7 +104,7 @@
                 return V;
             }
 
-            throw std::runtime_error("Cannot upcast non-integer to integer");
+            throw std::runtime_error("Cannot upcast float to integer");
         }
 
         Value *ensureFloat(Value *V)
@@ -103,6 +117,7 @@
             return Builder->CreateSIToFP(V, Type::getFloatTy(*TheContext), "floattmp");
         }
 
+        // Ensure that the value is of the correct type, does not allow lossy casts
         Value *ensureType(Value *V, Type::TypeID type) {
             if (V->getType()->getTypeID() == type) {
                 return V;
@@ -115,33 +130,29 @@
             return ensureFloat(V);
         }
 
+        // Ensure that the value is of the correct type, allows for lossy casts (FP to Int)
+        Value *ensureParamType(Value *V, Type *type) {
+            if (V->getType() == type) {
+                return V;
+            }
+
+            if (type->isIntegerTy()) {
+                // V is float, but param is int/bool (lossy cast)
+                if (V->getType() == Type::getFloatTy(*TheContext)) {
+                    return Builder->CreateFPToSI(V, type, "float_to_int");
+                }
+
+                return ensureInteger(V);
+            }
+
+            return ensureFloat(V);
+        }
+
         std::tuple<Value *, Value *, Type::TypeID> ensureSharedType(Value *L, Value *R) {
             // bool == int < float
             Type::TypeID typeID = std::min(L->getType()->getTypeID(), R->getType()->getTypeID());
             
             return std::make_tuple(ensureType(L, typeID), ensureType(R, typeID), typeID); 
-        }
-
-        Value *narrowingCast(Value *L, Type *R) {
-            // widening cast
-            if(R->getTypeID() > L->getType()->getTypeID()) {
-                return ensureType(L, R->getTypeID());
-            }
-
-            // narrowing cast
-            if(R->getTypeID() == Type::TypeID::FloatTyID) {
-                return L;
-            }
-
-            if(L->getType()->isFloatTy()) {
-                L = Builder->CreateFPToSI(L, Type::getInt32Ty(*TheContext), "float_to_int32");
-            }
-
-            if(R->getIntegerBitWidth() == 32) {
-                return L;
-            }
-
-            return Builder->CreateICmpNE(L, ConstantInt::get(*TheContext, APInt(32, 0, true)), "int32_to_bool");
         }
     };
 

@@ -107,7 +107,7 @@ inline Value *unary_op_builder(TOKEN_TYPE Op, llvm::Value *L, const llvm::Twine 
                     Builder->CreateNeg(L, Name);
             case TOKEN_TYPE::NOT:
                 return L->getType()->getTypeID() == Type::TypeID::FloatTyID ? 
-                    VariableCaster->ensureInteger(Builder->CreateFCmpOEQ(L, ConstantFP::get(*TheContext, APFloat(0.0)), Name)) : 
+                    VariableCaster->ensureInteger(Builder->CreateFCmpOEQ(L, ConstantFP::get(*TheContext, APFloat(0.0f)), Name)) : 
                     VariableCaster->ensureInteger(Builder->CreateICmpEQ(L, ConstantInt::get(*TheContext, APInt(32, 0, true)), Name)); 
             default:
                 throw std::runtime_error("Invalid unary operator");
@@ -116,20 +116,15 @@ inline Value *unary_op_builder(TOKEN_TYPE Op, llvm::Value *L, const llvm::Twine 
 
 Value *UnaryASTNode::codegen() {
     Value *L = Operand->codegen();
+
     return unary_op_builder(Op, L, "unary");
 }
 
-inline Value *operation_function(Type::TypeID type, TOKEN_TYPE Op, llvm::Value *L, llvm::Value *R, const llvm::Twine &Name) {
-        //std::function<Value *(llvm::Value *L, llvm::Value *R, const llvm::Twine &Name)> *func;
+inline Value *binary_operation(Type::TypeID type, TOKEN_TYPE Op, llvm::Value *L, llvm::Value *R, const llvm::Twine &Name) {
         std::vector<Value *> vals{L, R};
-        
-        std::cout << "Op: " << Op << std::endl;
-        std::cout << "L: " << std::endl;
-        L->print(llvm::outs());
-        std::cout << std::endl << "R: " << std::endl;
-        R->print(llvm::outs());
-        std::cout << std::endl << "Type: " << std::to_string((int)type) << std::endl;
+
         switch(Op) {
+            // Arithmetic ops:
             case TOKEN_TYPE::PLUS:
                 return BuildInt(type, Builder->CreateAdd, Builder->CreateFAdd);
             case TOKEN_TYPE::MINUS:
@@ -140,21 +135,18 @@ inline Value *operation_function(Type::TypeID type, TOKEN_TYPE Op, llvm::Value *
                 return BuildInt(type, Builder->CreateMul, Builder->CreateFMul);
             case TOKEN_TYPE::MOD:
                 return BuildInt(type, Builder->CreateSRem, Builder->CreateFRem);
-            //Boolean ops:
+
+            // Boolean ops:
             case TOKEN_TYPE::OR:
                 return Builder->CreateOr(ArrayRef<Value *>(vals));
             case TOKEN_TYPE::AND:
                 return Builder->CreateAnd(ArrayRef<Value *>(vals));
 
-            //Comparisons:
+            // Comparisons:
             case TOKEN_TYPE::EQ:
                 return BuildInt(type, Builder->CreateICmpEQ, Builder->CreateFCmpOEQ);
             case TOKEN_TYPE::NE:
                 return BuildInt(type, Builder->CreateICmpNE, Builder->CreateFCmpONE);
-                // return type == VariableType::INT
-                //     ? Builder->CreateICmpEQ(L, R, Name)
-                //     // Check truth
-                //     : Builder->CreateFCmpOEQ(L, R, Name);
             case TOKEN_TYPE::GE:
                 return BuildInt(type, Builder->CreateICmpSGE, Builder->CreateFCmpOGE);
             case TOKEN_TYPE::GT:
@@ -163,6 +155,7 @@ inline Value *operation_function(Type::TypeID type, TOKEN_TYPE Op, llvm::Value *
                 return BuildInt(type, Builder->CreateICmpSLE, Builder->CreateFCmpOLE);
             case TOKEN_TYPE::LT:
                 return BuildInt(type, Builder->CreateICmpSLT, Builder->CreateFCmpOLT);
+
             default:
                 throw std::runtime_error("Invalid binary operator");
         }
@@ -178,13 +171,19 @@ Value *BinaryASTNode::codegen() {
 
     auto [L_cast, R_cast, typeID] = VariableCaster->ensureSharedType(L, R);
 
-    auto res = operation_function(typeID, Op, L_cast, R_cast, "binary_op");
+    auto res = binary_operation(typeID, Op, L_cast, R_cast, "binary_op");
 
     return res;
 }
 
 Value *VariableRefASTNode::codegen() {
-    auto [V, Type] = VariableScope.getVariable(Name);
+    auto res = VariableScope.getVariable(Name);
+
+    if(!res.has_value()) {
+        SemanticError("Use of undeclared variable: `" + Name + "`.", Tok, fileName);
+    }
+    
+    auto [V, Type] = res.value();
 
     print_a_debug("Found variable reference: " + Name);
 
@@ -205,16 +204,16 @@ Value *CallExprAST::codegen() {
 
     for(int i = 0; i < Args.size(); i++) {
 
-        Value *gen = Args[i]->codegen();
+        Value *argValue = Args[i]->codegen();
 
         // TODO: test
-        if(gen->getType() != Function->getFunctionType()->getParamType(i)) {
-            gen = VariableCaster->narrowingCast(gen, Function->getFunctionType()->getParamType(i));
+        if(argValue->getType() != Function->getFunctionType()->getParamType(i)) {
+            SemanticWarning("Implicit cast from `" + type_to_string(argValue->getType()) + "` to `" + type_to_string(Function->getFunctionType()->getParamType(i)) + "`.", Tok, fileName);
+            argValue = VariableCaster->ensureParamType(argValue, Function->getFunctionType()->getParamType(i));
 
-            SemanticWarning("Implicit cast from `" + type_to_string(gen->getType()) + "` to `" + type_to_string(Function->getFunctionType()->getParamType(i)) + "`.", Tok);
         }
 
-        ArgsIR.push_back(gen);
+        ArgsIR.push_back(argValue);
     }
     // A name can not be assigned to a function call which returns void
     std::string name = Function->getReturnType()->isVoidTy() ? "" : "call_tmp";
@@ -229,7 +228,14 @@ Value *AssignmentASTNode::codegen() {
         SemanticError("Invalid assignment of expression", Tok, fileName);
     }
 
-    auto [Alloca, _] = VariableScope.getVariable(Name);
+
+    auto res = VariableScope.getVariable(Name);
+    if(!res.has_value()) {
+        SemanticError("Use of undeclared variable: `" + Name + "`.", Tok, fileName);
+    }
+    
+    auto [Alloca, _] = res.value();
+
     Builder->CreateStore(Val, Alloca);
     return Val;
 }
@@ -480,14 +486,18 @@ Value *VariableDeclASTNode::codegen() {
         
         //std::cout << "Global variable: " << (g->getType()->getTypeID() == Type::TypeID::PointerTyID) << std::endl;
 
-        VariableScope.addVariable(Name, g);
+        if(!VariableScope.addVariable(Name, g)) {
+            throw SemanticError("Variable `" + Name + "` already declared in this scope", Tok, fileName);
+        }
         return g;
     } else {
         Function *TheFunction = Builder->GetInsertBlock()->getParent();
         AllocaInst *Alloca = CreateAllocaArg(TheFunction, Name, GetType(Type));
 
-        VariableScope.addVariable(Name, Alloca);
-        std::cout << "Declaring variable " << Name << std::endl;
+        if(!VariableScope.addVariable(Name, Alloca)) {
+            throw SemanticError("Global variable `" + Name + "` has already been declared.", Tok, fileName);
+        }
+        
         return Alloca;
     }
 }
@@ -549,9 +559,7 @@ Value *FunctionDeclASTNode::codegen() {
     VariableScope.popScope();
 
     EliminateUnreachableBlocks(*F);
-    
-    TheModule->print(errs(), nullptr); // print IR to terminal
-    
+        
     // Ensure the function is valid
     if(verifyFunction(*F, &llvm::errs())) {
         throw SemanticError("Function `" + Name + "` is invalid. See error output.", this->Tok, fileName);
