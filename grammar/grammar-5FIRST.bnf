@@ -103,6 +103,5 @@ args ::= @"(" | "-" | "!" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT
 
 args ::= arg_list 
 
-# !NOT DISJOINT FIRST (expr)   
 arg_list ::= @"(" | "-" | "!" | INT_LIT | FLOAT_LIT | BOOL_LIT | IDENT
 arg_list_prime ::= @"," | epsilon

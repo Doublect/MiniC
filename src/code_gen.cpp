@@ -22,6 +22,7 @@
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
+#include <llvm/IR/Attributes.h>
 #include<map>
 #include<memory>
 #include<ostream>
@@ -71,44 +72,58 @@ static Type *GetType(TypeSpecType tst) {
     }
 }
 
+static std::string GetTypeName(Type *type) {
+    switch(type->getTypeID()) {
+        case Type::TypeID::IntegerTyID:
+            return "integer";
+
+        case Type::TypeID::FloatTyID:
+            return "float";
+
+        case Type::TypeID::PointerTyID:
+            return "pointer";
+
+        default:
+            return "unknown";
+    }
+}
+
 static AllocaInst *CreateAllocaArg(Function *TheFunction, const std::string &VarName, Type *Type) {
     IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
 
-    print_a_debug("Creating alloca for " + VarName);
+    PrintDebug("Creating alloca for " + VarName);
 
     return TmpB.CreateAlloca(
         Type, 
-        0, 
+        nullptr, 
         VarName.c_str());
 }
 
 #pragma region Expressions
 
 Value *IntASTNode::codegen() {
-    // std::cout << "Found int: " << Val << std::endl;
     return ConstantInt::get(*TheContext, APInt(32, Val, true));
 }
 
 Value *FloatASTNode::codegen() {
-    // std::cout << "Found float: " << Val << std::endl;
     return ConstantFP::get(*TheContext, APFloat(Val));
 }
 
 Value *BoolASTNode::codegen() {
-    // std::cout << "Found bool: " << Val << std::endl;
     return ConstantInt::get(*TheContext, APInt(32, (int)Val, true));
 }
 
-inline Value *unary_op_builder(TOKEN_TYPE Op, llvm::Value *L, const llvm::Twine &Name) {
+inline Value *BuildUnaryOperator(TOKEN_TYPE Op, llvm::Value *L, const llvm::Twine &Name) {
         switch(Op) {
             case TOKEN_TYPE::MINUS:
                 return L->getType()->getTypeID() == Type::TypeID::FloatTyID ? 
                     Builder->CreateFNeg(L, Name) : 
                     Builder->CreateNeg(L, Name);
             case TOKEN_TYPE::NOT:
+                // Comparison operators are guaranteed to return i1
                 return L->getType()->getTypeID() == Type::TypeID::FloatTyID ? 
-                    VariableCaster->ensureInteger(Builder->CreateFCmpOEQ(L, ConstantFP::get(*TheContext, APFloat(0.0f)), Name)) : 
-                    VariableCaster->ensureInteger(Builder->CreateICmpEQ(L, ConstantInt::get(*TheContext, APInt(32, 0, true)), Name)); 
+                        VariableCaster->ensureInteger(Builder->CreateFCmpOEQ(L, ConstantFP::get(*TheContext, APFloat(0.0f)), Name)) : 
+                        VariableCaster->ensureInteger(Builder->CreateICmpEQ(L, ConstantInt::get(*TheContext, APInt(32, 0, true)), Name));
             default:
                 throw std::runtime_error("Invalid unary operator");
         }       
@@ -117,10 +132,10 @@ inline Value *unary_op_builder(TOKEN_TYPE Op, llvm::Value *L, const llvm::Twine 
 Value *UnaryASTNode::codegen() {
     Value *L = Operand->codegen();
 
-    return unary_op_builder(Op, L, "unary");
+    return BuildUnaryOperator(Op, L, "unary");
 }
 
-inline Value *binary_operation(Type::TypeID type, TOKEN_TYPE Op, llvm::Value *L, llvm::Value *R, const llvm::Twine &Name) {
+inline Value *BuildBinaryOperator(Type::TypeID type, TOKEN_TYPE Op, llvm::Value *L, llvm::Value *R, const llvm::Twine &Name) {
         std::vector<Value *> vals{L, R};
 
         switch(Op) {
@@ -164,14 +179,21 @@ inline Value *binary_operation(Type::TypeID type, TOKEN_TYPE Op, llvm::Value *L,
 Value *BinaryASTNode::codegen() {
     Value *L = LHS->codegen();
     Value *R = RHS->codegen();
-    print_a_debug(
+    PrintDebug(
             "L: " + std::to_string((int)L->getType()->getTypeID()) 
             + " R: " + std::to_string((int)R->getType()->getTypeID()) 
         );
 
     auto [L_cast, R_cast, typeID] = VariableCaster->ensureSharedType(L, R);
 
-    auto res = binary_operation(typeID, Op, L_cast, R_cast, "binary_op");
+    if(L_cast == nullptr) {
+        SemanticError("Cannot upcast float to integer", LHS->getToken(), fileName);
+    }
+    if(R_cast == nullptr) {
+        SemanticError("Cannot upcast float to integer", RHS->getToken(), fileName);
+    }
+
+    auto res = BuildBinaryOperator(typeID, Op, L_cast, R_cast, "binary_op");
 
     return res;
 }
@@ -185,7 +207,7 @@ Value *VariableRefASTNode::codegen() {
     
     auto [V, Type] = res.value();
 
-    print_a_debug("Found variable reference: " + Name);
+    PrintDebug("Found variable reference: " + Name);
 
     return Builder->CreateLoad(Type, V, Name.c_str());
 }
@@ -206,15 +228,15 @@ Value *CallExprAST::codegen() {
 
         Value *argValue = Args[i]->codegen();
 
-        // TODO: test
         if(argValue->getType() != Function->getFunctionType()->getParamType(i)) {
             SemanticWarning("Implicit cast from `" + type_to_string(argValue->getType()) + "` to `" + type_to_string(Function->getFunctionType()->getParamType(i)) + "`.", Tok, fileName);
+            
             argValue = VariableCaster->ensureParamType(argValue, Function->getFunctionType()->getParamType(i));
-
         }
 
         ArgsIR.push_back(argValue);
     }
+
     // A name can not be assigned to a function call which returns void
     std::string name = Function->getReturnType()->isVoidTy() ? "" : "call_tmp";
 
@@ -234,7 +256,13 @@ Value *AssignmentASTNode::codegen() {
         SemanticError("Use of undeclared variable: `" + Name + "`.", Tok, fileName);
     }
     
-    auto [Alloca, _] = res.value();
+    auto [Alloca, AllType] = res.value();
+
+    Val = VariableCaster->ensureType(Val, AllType->getTypeID());
+    if(!Val) {
+        SemanticError("Cannot assign value of type `" + GetTypeName(Val->getType()) 
+            + "` to variable of type `" + GetTypeName(AllType) + "`.", Tok, fileName);
+    }
 
     Builder->CreateStore(Val, Alloca);
     return Val;
@@ -475,19 +503,15 @@ Value *ReturnStmtASTNode::codegen() {
 #pragma region Declarations
 
 Value *VariableDeclASTNode::codegen() {
-    if(Builder->GetInsertBlock() == nullptr) {
-        if(VariableScope.isGlobalVariableDeclared(Name)) {
-            SemanticError("Variable `" + Name + "` has already been declared.", Tok, fileName);
-        }
 
+    if(VariableScope.isGlobalScope()) {
+        // Create default value for global (0)
         Constant *consta = Type == VariableType::FLOAT ? (Constant *)ConstantFP::get(*TheContext, APFloat(0.0f)) : (Constant *)ConstantInt::get(*TheContext, APInt(32, 0, true));
         GlobalVariable* g =
             new GlobalVariable(*TheModule, GetType(Type), false, GlobalValue::CommonLinkage, consta, Name);
         
-        //std::cout << "Global variable: " << (g->getType()->getTypeID() == Type::TypeID::PointerTyID) << std::endl;
-
         if(!VariableScope.addVariable(Name, g)) {
-            throw SemanticError("Variable `" + Name + "` already declared in this scope", Tok, fileName);
+            SemanticError("Global variable `" + Name + "` has already been declared.", Tok, fileName);
         }
         return g;
     } else {
@@ -495,7 +519,7 @@ Value *VariableDeclASTNode::codegen() {
         AllocaInst *Alloca = CreateAllocaArg(TheFunction, Name, GetType(Type));
 
         if(!VariableScope.addVariable(Name, Alloca)) {
-            throw SemanticError("Global variable `" + Name + "` has already been declared.", Tok, fileName);
+            SemanticError("Variable `" + Name + "` already declared in this scope.", Tok, fileName);
         }
         
         return Alloca;
@@ -514,7 +538,7 @@ Value *FunctionDeclASTNode::codegen() {
     FunctionType *FT = FunctionType::get(GetType(ReturnType), ArgsTypes, false);
 
     if(TheModule->getFunction(Name)) {
-        throw SemanticError("Function `" + Name + "` previously declared", this->Tok, fileName);
+        SemanticError("Function `" + Name + "` previously declared.", this->Tok, fileName);
     }
 
     Function *F = Function::Create(FT, Function::ExternalLinkage, Name, TheModule.get());
@@ -531,11 +555,15 @@ Value *FunctionDeclASTNode::codegen() {
 
     // Create a new scope for the function
     VariableScope.pushScope();
+
+    int i = 0;
     for(auto &arg: F->args()) {
-        AllocaInst *Alloca = CreateAllocaArg(F, arg.getName().str(), arg.getType());
+        AllocaInst *Alloca = CreateAllocaArg(F, arg.getName().str(), ArgsTypes[i]);
 
         Builder->CreateStore(&arg, Alloca);
         VariableScope.addVariable(arg.getName().str(), Alloca);
+
+        i++;
     }
 
     // Do the body's code generation
@@ -558,11 +586,13 @@ Value *FunctionDeclASTNode::codegen() {
 
     VariableScope.popScope();
 
+    // As creating new blocks upon returns may lead to blocks with no predecessors,
+    // prune the functions basic block 'tree'
     EliminateUnreachableBlocks(*F);
         
     // Ensure the function is valid
     if(verifyFunction(*F, &llvm::errs())) {
-        throw SemanticError("Function `" + Name + "` is invalid. See error output.", this->Tok, fileName);
+        SemanticError("Function `" + Name + "` is invalid. See error output.", this->Tok, fileName);
     }
 
 

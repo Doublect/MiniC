@@ -29,16 +29,16 @@ int main() {
 
     switch(res) {
       case 2000:
-        std::cout << "PASSED: Scopes work" << std::endl;
+        std::cout << "PASSED Result: Scopes work" << std::endl;
         break;
       case 1002:
-        std::cout << "FAILED: Local scope does not work Result: " << res << std::endl;
+        std::cout << "FAILED Result: Local scope does not work " << res << std::endl;
         break;
       case 1001:
-        std::cout << "FAILED: Global scope does not work Result: " << res << std::endl;
+        std::cout << "FAILED Result: Global scope does not work " << res << std::endl;
         break;
       case 3:
-        std::cout << "FAILED: No scoping Result: " << res << std::endl;
+        std::cout << "FAILED Result: No scoping " << res << std::endl;
         break;
     }
 }

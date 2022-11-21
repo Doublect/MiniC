@@ -15,3 +15,12 @@ tests/cosine/cosine
 tests/factorial/fact
 tests/fibonacci/fib
 tests/addition/add
+hardertests/assign/assign
+hardertests/associativity/assoc
+hardertests/global/global
+hardertests/implicit/imp
+hardertests/lazyeval/lazyeval
+hardertests/returns/returns
+hardertests/scope/scope
+hardertests/unary2/unary2
+hardertests/while/while

@@ -84,12 +84,18 @@ class ExprASTNode : public StatementASTNode
 {
 protected:
   TypeSpecType Type;
+  TOKEN Tok;
+
 public:
   ExprASTNode() = default;
   virtual Value *codegen() override = 0;
   virtual std::shared_ptr<ASTPrint> to_ast_print() override = 0;
 
   virtual TypeSpecType getType() { return Type; };
+
+  TOKEN getToken() const {
+    return Tok;
+  }
 };
 
 /// AST representation of an integer number
@@ -97,11 +103,11 @@ class IntASTNode : public ExprASTNode
 {
   int Val;
   std::string Name;
-  TOKEN Tok;
 
 public:
-  IntASTNode(TOKEN tok, int val) : Val(val), Tok(tok) {
+  IntASTNode(TOKEN tok, int val) : Val(val) {
     Type = TypeSpecType::INT;
+    Tok = tok;
   }
   Value *codegen() override;
   std::shared_ptr<ASTPrint> to_ast_print() override
@@ -118,11 +124,11 @@ class FloatASTNode : public ExprASTNode
 {
   float Val;
   std::string Name;
-  TOKEN Tok;
 
 public:
-  FloatASTNode(TOKEN tok, float val) : Val(val), Tok(tok) {
+  FloatASTNode(TOKEN tok, float val) : Val(val) {
     Type = TypeSpecType::FLOAT;
+    Tok = tok;
   }
   Value *codegen() override;
   std::shared_ptr<ASTPrint> to_ast_print() override
@@ -139,11 +145,11 @@ class BoolASTNode : public ExprASTNode
 {
   bool Val;
   std::string Name;
-  TOKEN Tok;
 
 public:
-  BoolASTNode(TOKEN tok, bool val) : Val(val), Tok(tok) {
+  BoolASTNode(TOKEN tok, bool val) : Val(val) {
     Type = TypeSpecType::BOOL;
+    Tok = tok;
   }
   Value *codegen() override;
   std::shared_ptr<ASTPrint> to_ast_print() override
@@ -164,11 +170,12 @@ class UnaryASTNode : public ExprASTNode
   TOKEN_TYPE Op;
   std::unique_ptr<ExprASTNode> Operand;
 
-  TOKEN Tok;
-
 public:
   UnaryASTNode(TOKEN_TYPE op, std::unique_ptr<ExprASTNode> operand, TOKEN tok)
-      : Op(op), Operand(std::move(operand)), Tok(tok) { Type = Operand->getType(); }
+      : Op(op), Operand(std::move(operand)) { 
+        Type = Operand->getType(); 
+        Tok = tok;
+      }
   Value *codegen() override;
 
   std::shared_ptr<ASTPrint> to_ast_print() override
@@ -188,12 +195,12 @@ protected:
   TOKEN_TYPE Op;
   std::unique_ptr<ExprASTNode> LHS, RHS;
 
-  TOKEN Tok;
-
 public:
   BinaryASTNode(TOKEN_TYPE op, std::unique_ptr<ExprASTNode> LHS,
                 std::unique_ptr<ExprASTNode> RHS, TOKEN tok)
-      : Op(op), LHS(std::move(LHS)), RHS(std::move(RHS)), Tok(tok) {}
+      : Op(op), LHS(std::move(LHS)), RHS(std::move(RHS)) {
+        Tok = tok;
+      }
   Value *codegen() override;
 
   std::shared_ptr<ASTPrint> to_ast_print() override
@@ -246,10 +253,11 @@ public:
 class VariableRefASTNode : public ExprASTNode
 {
   std::string Name;
-  TOKEN Tok;
 
 public:
-  VariableRefASTNode(TOKEN tok, std::string &&Name) : Name(Name) {}
+  VariableRefASTNode(TOKEN tok, std::string &&Name) : Name(Name) {
+    Tok = tok;
+  }
   Value *codegen() override;
   std::shared_ptr<ASTPrint> to_ast_print() override
   {
@@ -267,12 +275,12 @@ class CallExprAST : public ExprASTNode
   std::string FunctionName;
   std::vector<std::unique_ptr<ExprASTNode>> Args;
 
-  TOKEN Tok;
-
 public:
   CallExprAST(TOKEN tok, std::string &&funcName,
               std::vector<std::unique_ptr<ExprASTNode>> Args)
-      : Tok(tok), FunctionName(funcName), Args(std::move(Args)) {}
+      : FunctionName(funcName), Args(std::move(Args)) {
+        Tok = tok;
+      }
   Value *codegen() override;
 
   std::shared_ptr<ASTPrint> to_ast_print() override
@@ -289,12 +297,13 @@ class AssignmentASTNode : public ExprASTNode
 {
   std::string Name;
   std::unique_ptr<ExprASTNode> RHS;
-  TOKEN Tok;
 
 public:
   AssignmentASTNode(TOKEN tok, std::string &&Name,
                     std::unique_ptr<ExprASTNode> RHS)
-      : Name(Name), RHS(std::move(RHS)) {}
+      : Name(Name), RHS(std::move(RHS)) {
+        Tok = tok;
+      }
   Value *codegen() override;
   std::shared_ptr<ASTPrint> to_ast_print() override
   {
@@ -452,7 +461,7 @@ public:
     return make_ast_print(
         "VariableDeclASTNode",
         "Name: " + Name,
-        { make_ast_leaf("Type: " + std::to_string((int)Type)) }
+        { make_ast_leaf("Type: " + tokenTypeToString((int)Type)) }
         );
   }
   VariableType getType() { return Type; }
@@ -491,7 +500,7 @@ public:
         {
           make_ast_children("Args:", map_printer(Args)),
           make_ast_labelled("Body:", Body->to_ast_print()),
-          make_ast_leaf("ReturnType: " + std::to_string(ReturnType))
+          make_ast_leaf("ReturnType: " + tokenTypeToString((int)ReturnType))
         }
       );
   }

@@ -20,26 +20,23 @@ extern std::string StringVal;
 
 using namespace std::string_literals;
 
-#define ConsumeAssign(type, variable, result) \
-  { ResultMonad<type> res = result(); \
+// Assign returned unique_ptr of value to passed in variable
+#define ConsumeAssign(type, variable, parserFn) \
+  { ResultMonad<type> res = parserFn(); \
   if(res.success()) { variable = std::move(res).unwrap(); } else { return res; }}
+// Create variable and assign unique_ptr value
 #define Consume(type, variable, result) \
   std::unique_ptr<type> variable; \
   ConsumeAssign(type, variable, result);
 
-#define ConsumeAssignVal(type, variable, result) \
-  { ResultMonad<type> res = result(); \
+// Assign the returned value, without any smart pointers
+#define ConsumeAssignVal(type, variable, parserFn) \
+  { ResultMonad<type> res = parserFn(); \
   if(res.success()) { variable = *std::move(res).unwrap_val(); } else { return res; }}
+// Create variable, assign the returned value, without any smart pointers
 #define ConsumeVal(type, variable, result) \
   type variable; \
   ConsumeAssignVal(type, variable, result);
-
-#define ConsumeAssignNoCall(type, variable, result) \
-  { ResultMonad<type> res = result; \
-  if(res.success()) { variable = std::move(res).unwrap(); } else { return res; }}
-#define ConsumeNoCall(type, variable, result) \
-  std::unique_ptr<type> variable; \
-  ConsumeAssignNoCall(type, variable, result);
 
 #define LogError(string) \
   return ResultMonad<void>(ErrorT(string));
@@ -451,6 +448,7 @@ static ResultMonad<IfElseASTNode> if_stmt(){
   Consume(ExprASTNode, condition, expr);
   Expect(TOKEN_TYPE::RPAR);
   Consume(BlockASTNode, then_branch, block);
+
   if(CurTok.type == TOKEN_TYPE::ELSE) {
     getNextToken();
     ConsumeAssign(BlockASTNode, else_branch, block);

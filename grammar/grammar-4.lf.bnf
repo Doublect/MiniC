@@ -76,8 +76,6 @@ expr ::= IDENT "=" expr
 # 1. Literals
 literals ::=  INT_LIT | FLOAT_LIT | BOOL_LIT
 identifiers ::= IDENT | IDENT "(" args ")" | IDENT "(" ")"
-# identifier_end ::= "(" ident_end_end | "(" ident_end_end | epsilon
-# ident_end_end ::= args ")" | ")"
 
 primary_expr ::= literals | identifiers
 
@@ -102,8 +100,7 @@ and_expr_prime ::= "&&" eq_expr and_expr_prime | epsilon
 or_expr ::= and_expr or_expr_prime
 or_expr_prime ::= "||" and_expr or_expr_prime | epsilon
 
-assign_expr 
-
+# Arguments
 args ::= arg_list 
 
 arg_list ::= expr arg_list_prime

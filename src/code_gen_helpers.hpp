@@ -34,11 +34,16 @@
         void pushScope() {
             ScopeStack.push(std::set<std::string>());
 
-            print_a_debug("Opening scope" + std::to_string(ScopeStack.size()));
+            PrintDebug("Opening scope" + std::to_string(ScopeStack.size()));
         }
 
         void popScope() {
-            print_a_debug("Closing scope" + std::to_string(ScopeStack.size()));
+            // Disallow popping of the global scope
+            if(ScopeStack.size() <= 1) {
+                return;
+            }
+
+            PrintDebug("Closing scope" + std::to_string(ScopeStack.size()));
 
             for (auto &Name : ScopeStack.top()) {
                 NamedValues[Name].pop();
@@ -67,7 +72,7 @@
         }
 
         std::optional<std::tuple<Value *, Type *>>getVariable(const std::string &Name) {
-            print_a_debug("Searching for variable: " + Name);
+            PrintDebug("Searching for variable: " + Name);
 
             if(NamedValues.contains(Name) && NamedValues[Name].size() > 0) {
                 return std::make_optional(std::make_tuple(NamedValues[Name].top(), NamedValues[Name].top()->getAllocatedType()));
@@ -76,12 +81,16 @@
             if(GlobalVariables.contains(Name)) {
                 return std::make_optional(std::make_tuple(GlobalVariables[Name], GlobalVariables[Name]->getValueType()));
             }
-            // TODO: Error
+
             return std::nullopt;
         }
 
         bool isGlobalVariableDeclared(const std::string &Name) {
             return GlobalVariables.contains(Name);
+        }
+
+        bool isGlobalScope() {
+            return ScopeStack.size() == 1;
         }
     };
 
@@ -95,6 +104,7 @@
         VariableCastManager(std::shared_ptr<IRBuilder<>> Builder, std::shared_ptr<LLVMContext> Context) 
             : Builder(Builder), TheContext(Context) {}
 
+        // make sure the value is casted to `i32`
         Value *ensureInteger(Value *V) 
         {
             if (V->getType()->isIntegerTy()) {
@@ -104,9 +114,11 @@
                 return V;
             }
 
-            throw std::runtime_error("Cannot upcast float to integer");
+            // Don't allow float -> int cast
+            return nullptr;
         }
 
+        // make sure the value is casted to `f32`
         Value *ensureFloat(Value *V)
         {
             if (V->getType()->isFloatTy()) {
@@ -117,7 +129,7 @@
             return Builder->CreateSIToFP(V, Type::getFloatTy(*TheContext), "floattmp");
         }
 
-        // Ensure that the value is of the correct type, does not allow lossy casts
+        // Ensure that the value is of the given type, does not allow lossy casts
         Value *ensureType(Value *V, Type::TypeID type) {
             if (V->getType()->getTypeID() == type) {
                 return V;
@@ -156,7 +168,7 @@
         }
     };
 
-    constexpr std::string type_to_string(Type *type) {
+    inline std::string type_to_string(Type *type) {
         if(type->isFloatTy()) {
             return "float";
         }

@@ -84,7 +84,6 @@ int main(int argc, char **argv) {
 
     return 1;
   } else {
-    std::cout << res.success() << std::endl;
     std::cout << "Successful Parsing" << std::endl;
     std::unique_ptr<ProgramASTNode> AST = std::move(res).unwrap();
     

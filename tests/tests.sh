@@ -10,7 +10,7 @@ export LLVM_INSTALL_PATH=/modules/cs325/llvm-15.0.0
 export PATH=$LLVM_INSTALL_PATH/bin:$PATH
 export LD_LIBRARY_PATH=$LLVM_INSTALL_PATH/lib:$LD_LIBRARY_PATH
 #CLANG=$LLVM_INSTALL_PATH/bin/clang++
-CLANG=clang++
+CLANG=$LLVM_INSTALL_PATH/bin/clang++
 
 module load GCC/9.2.0
 
@@ -23,9 +23,7 @@ rm -rf ./mccomp
 echo "Compile *****"
 
 make clean
-# TODO
-#make mccomp
-make 
+make mccomp
 
 COMP=$DIR/mccomp
 echo $COMP
